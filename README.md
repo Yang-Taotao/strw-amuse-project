@@ -16,4 +16,5 @@ We list the collaborators in alphabetical order.
 
 ## Usage
 
--- WIP
+- Check [Documentation](./docs/AMUSE_Install_v2025.9.0.md) for AMUSE installation setup.
+- AMUSE v2025.9.0 required for current project.
