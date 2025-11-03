@@ -1,3 +1,7 @@
+---
+Author: Taotao Yang
+Date Created: 2025-10-02
+---
 # Installation gudie for AMUSE v2025.9.0
 
 In this guide, we will give a step-by-step process of how to properly install AMUSE on you Windows computer.
@@ -119,3 +123,9 @@ We should fix the MPI error on Ubuntu with:
 ```
 
 If error shows up indicating the file does not exist, simply go to `~/.openmpi` and create `mca-params.conf` with `btl_tcp_if_include=lo` as the sole content.
+
+It is also great to just install everything amuse has to offer with:
+
+```bash
+> ./setup install all
+```

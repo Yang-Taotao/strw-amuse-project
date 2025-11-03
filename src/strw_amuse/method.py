@@ -1,12 +1,10 @@
 """
-Example version checking script.
+Methods for STRW-AMUSE project.
 """
 import amuse
 import amuse._version
 
-def version_check() -> str:
+def amuse_version_check() -> None:
     '''Display the version of AMUSE.'''
     print(f'AMUSE on v: {amuse._version.__version__}')
-
-if __name__=='__main__':
-    version_check()
+    return None
