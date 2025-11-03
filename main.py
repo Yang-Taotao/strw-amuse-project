@@ -2,13 +2,13 @@
 Main script for running the 6-body encounter simulation and visualization.
 """
 
+# %%
 # import
 from src.strw_amuse.run_6body_encounter import run_6_body_simulation
 from src.strw_amuse.gif_plotting import visualize_frames
 
-# ------------------------------ #
+# %%
 # No encounter (ref case)
-# ------------------------------ #
 # Set initial conditions
 age = 3.5  # Myr
 masses = [90, 10, 20, 70, 10, 10]  # Msun
@@ -26,7 +26,8 @@ v_coms = [
 ]  # km/s
 direction = [0.4, -0.6, 1.2]
 
-# Run sim
+# %%
+# Run sim - no encounter
 no_colission, _, _ = run_6_body_simulation(
     age=age,
     masses=masses,
@@ -37,12 +38,13 @@ no_colission, _, _ = run_6_body_simulation(
     v_coms=v_coms,
     run_label="Test_No_Collision",
 )
-# Visualize
+
+# %%
+# Visualize - no encounter
 visualize_frames(frames=no_colission, run_label="Test_No collision")
 
-# ------------------------------ #
+# %%
 # Encounter with collision
-# ------------------------------ #
 # Set initial conditions
 age = 3.5
 masses = [80, 40, 30, 20, 40, 10]
@@ -60,7 +62,8 @@ v_coms = [
 ]
 directions = [0.0, 0.4, -0.4]
 
-# Run sim
+# %%
+# Run sim - collisions
 frames, max_mass, max_vel = run_6_body_simulation(
     age=age,
     masses=masses,
@@ -72,5 +75,6 @@ frames, max_mass, max_vel = run_6_body_simulation(
     run_label="Run_for_ejection",
 )
 
-# Visualize
+# %%
+# Visualize - collisions
 visualize_frames(frames, "Collision")
