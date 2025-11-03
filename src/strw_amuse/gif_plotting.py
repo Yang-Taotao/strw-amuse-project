@@ -1,18 +1,22 @@
+"""
+Plotting utilities for AMUSE simulation.
+"""
 
-
-#import librarie
-
-
+# import
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
-import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-import os
+from matplotlib.animation import FuncAnimation, PillowWriter
+
 from amuse.units import units
 
+from config import OUTPUT_DIR_GIF
 
-def visualize_frames(frames, run_label="test"):
+# func repo
+
+
+def visualize_frames(frames, run_label="test") -> None:
     """
     Visualize AMUSE simulation frames and produce a GIF.
 
@@ -21,60 +25,75 @@ def visualize_frames(frames, run_label="test"):
     Color-coded by stellar mass (with colorbar).
     """
 
+    # Create output directory if none exists
+    os.makedirs(name=OUTPUT_DIR_GIF, exist_ok=True)
+
+    # Exception for empty frames
     if len(frames) == 0:
-        print("⚠️ No frames provided.")
-        return
+        print("Caution: No frames provided. Exitting visualization.")
+        return None
 
-    os.makedirs("Gif-6body", exist_ok=True)
-
-    # --- Gather all masses for color normalization ---
-    all_masses = np.array([p.mass.value_in(units.MSun) for f in frames for p in f])
+    # Gather all masses for color normalization
+    all_masses = np.array(
+        object=[p.mass.value_in(units.MSun) for f in frames for p in f]
+    )
     m_min, m_max = all_masses.min(), all_masses.max()
-    cmap = plt.get_cmap("plasma")
+
+    # Color map setup
+    cmap = plt.get_cmap(name="plasma")
     norm = mcolors.Normalize(vmin=m_min, vmax=m_max)
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 
     def mass_to_color(mass):
         return cmap(norm(mass))
 
-    # --- Find most massive star in final frame ---
+    # Find most massive star in final frame
     final_frame = frames[-1]
-    final_masses = np.array([p.mass.value_in(units.MSun) for p in final_frame])
-    max_index = np.argmax(final_masses)
-    print(f"Tracking most massive star (index {max_index}) with final mass {final_masses[max_index]:.2f} M☉")
+    final_masses = np.array(object=[p.mass.value_in(units.MSun) for p in final_frame])
+    max_index = np.argmax(a=final_masses)
+    print(
+        f"Tracking:"
+        f"Most massive star at index {max_index} with final mass {final_masses[max_index]:.2f} M☉"
+    )
 
     # Extract its position at each frame (to recenter)
-    tracked_positions = np.array([
-        [
-            f[max_index].x.value_in(units.AU),
-            f[max_index].y.value_in(units.AU)
+    tracked_positions = np.array(
+        object=[
+            [f[max_index].x.value_in(units.AU), f[max_index].y.value_in(units.AU)]
+            for f in frames
         ]
-        for f in frames
-    ])
+    )
 
-    # --- Figure setup ---
+    # Figure setup
     fig, ax = plt.subplots(figsize=(8, 6))
     sc = ax.scatter([], [], s=[])
-    time_text = ax.text(0.02, 0.95, "", transform=ax.transAxes, fontsize=12,
-                        verticalalignment='top', color='black')
+    time_text = ax.text(
+        x=0.02,
+        y=0.95,
+        s="",
+        transform=ax.transAxes,
+        fontsize=12,
+        verticalalignment="top",
+        color="black",
+    )
 
-    ax.set_xlabel("x [AU]", fontsize=12)
-    ax.set_ylabel("y [AU]", fontsize=12)
-    ax.set_title("Centered on most massive star", fontsize=13)
+    ax.set_xlabel(xlabel="x [AU]", fontsize=12)
+    ax.set_ylabel(ylabel="y [AU]", fontsize=12)
+    ax.set_title(label="Centered on most massive star", fontsize=13)
 
     # Colorbar
-    cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("Mass [M$_\\odot$]", fontsize=12)
+    cbar = plt.colorbar(mappable=sm, ax=ax, fraction=0.046, pad=0.04)
+    cbar.set_label(label="Mass [M$_\\odot$]", fontsize=12)
     cbar.ax.tick_params(labelsize=10)
 
-    # --- Initialization ---
+    # Initialization
     def init():
-        sc.set_offsets(np.empty((0, 2)))
-        ax.set_xlim(-1200, 1200)
-        ax.set_ylim(-1200, 1200)
+        sc.set_offsets(offsets=np.empty((0, 2)))
+        ax.set_xlim(left=-1200, right=1200)
+        ax.set_ylim(bottom=-1200, top=1200)
         return sc, time_text
 
-    # --- Frame update ---
+    # Frame update
     def update(frame_index):
         frame = frames[frame_index]
         x = np.array([p.x.value_in(units.AU) for p in frame])
@@ -101,13 +120,20 @@ def visualize_frames(frames, run_label="test"):
 
         return sc, time_text
 
-    # --- Animation ---
-    ani = FuncAnimation(fig, update, frames=len(frames),
-                        init_func=init, interval=50, blit=False, repeat=False)
+    # Animation
+    ani = FuncAnimation(
+        fig=fig,
+        func=update,
+        frames=len(frames),
+        init_func=init,
+        interval=50,
+        blit=False,
+        repeat=False,
+    )
 
-    gif_filename = os.path.join("Gif-6body", f"encounter_evolution_{run_label}.gif")
+    gif_filename = os.path.join(OUTPUT_DIR_GIF, f"encounter_evolution_{run_label}.gif")
     writer = PillowWriter(fps=12)
-    ani.save(gif_filename, writer=writer)
+    ani.save(filename=gif_filename, writer=writer)
 
-    print(f"🎬 GIF saved as {gif_filename}")
-    plt.close(fig)
+    print(f"GIF saved at {gif_filename}")
+    plt.close(fig=fig)
