@@ -11,7 +11,7 @@ from matplotlib.animation import FuncAnimation, PillowWriter
 
 from amuse.units import units
 
-from config import OUTPUT_DIR_GIF
+from src.strw_amuse.config import OUTPUT_DIR_GIF
 
 # func repo
 
@@ -50,16 +50,17 @@ def visualize_frames(frames, run_label="test") -> None:
     # Find most massive star in final frame
     final_frame = frames[-1]
     final_masses = np.array(object=[p.mass.value_in(units.MSun) for p in final_frame])
-    max_index = np.argmax(a=final_masses)
+    max_idx = np.argmax(a=final_masses)
     print(
-        f"Tracking:"
-        f"Most massive star at index {max_index} with final mass {final_masses[max_index]:.2f} M☉"
+        f"""Tracking:
+        Most massive star at idx {max_idx} with final mass {final_masses[max_idx]:.2f} M$_\\odot$
+        """
     )
 
     # Extract its position at each frame (to recenter)
     tracked_positions = np.array(
         object=[
-            [f[max_index].x.value_in(units.AU), f[max_index].y.value_in(units.AU)]
+            [f[max_idx].x.value_in(units.AU), f[max_idx].y.value_in(units.AU)]
             for f in frames
         ]
     )
@@ -94,8 +95,8 @@ def visualize_frames(frames, run_label="test") -> None:
         return sc, time_text
 
     # Frame update
-    def update(frame_index):
-        frame = frames[frame_index]
+    def update(frame_idx):
+        frame = frames[frame_idx]
         x = np.array([p.x.value_in(units.AU) for p in frame])
         y = np.array([p.y.value_in(units.AU) for p in frame])
         masses = np.array([p.mass.value_in(units.MSun) for p in frame])
@@ -104,8 +105,8 @@ def visualize_frames(frames, run_label="test") -> None:
         colors = [mass_to_color(m) for m in masses]
 
         # Center all coordinates on tracked star
-        x_rel = x - tracked_positions[frame_index, 0]
-        y_rel = y - tracked_positions[frame_index, 1]
+        x_rel = x - tracked_positions[frame_idx, 0]
+        y_rel = y - tracked_positions[frame_idx, 1]
 
         sc.set_offsets(np.c_[x_rel, y_rel])
         sc.set_sizes(sizes)
@@ -115,7 +116,7 @@ def visualize_frames(frames, run_label="test") -> None:
         ax.set_ylim(-1200, 1200)
 
         dt = 5  # years per frame
-        t = frame_index * dt
+        t = frame_idx * dt
         time_text.set_text(f"t = {t:.0f} yr")
 
         return sc, time_text
