@@ -217,3 +217,5 @@ __marimo__/
 
 # AMUSE
 *__amuse_code_output/
+*.amuse
+data/
