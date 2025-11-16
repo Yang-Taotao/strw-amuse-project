@@ -4,6 +4,14 @@ This is the README document for strw-amuse-project, a project for the 2025 [***S
 
 **Dated:** 2025-October-04
 
+## Index
+
+* [Collaborators](#collaborators)
+* [Usage](#usage)
+* [Goals](#goals)
+* [Grading](#grading-rubric)
+* [Archived](#archived)
+
 ## Collaborators
 
 We list the collaborators in alphabetical order.
@@ -16,9 +24,13 @@ We list the collaborators in alphabetical order.
 
 ## Usage
 
-- Run scripts from [main.py](./main.py)
-- Check [Documentation](./docs/AMUSE_Install_v2025.9.0.md) for AMUSE installation setup.
-- AMUSE `v2025.9.0` required for current project.
+![Linux](https://img.shields.io/badge/-Linux-grey?logo=linux)
+![macOS](https://img.shields.io/badge/-OSX-black?logo=apple)
+
+* Run scripts with [main.py](./main.py)
+* Check [Documentation](./docs/AMUSE_Install_v2025.9.0.md) for AMUSE installation setup.
+* AMUSE [`v2025.9.0`](https://github.com/amusecode/amuse/releases/tag/v2025.9.0) required for current project.
+* Conda [env](./environment.yml) recommended.
 
 ## Goals
 
@@ -26,13 +38,13 @@ We list the collaborators in alphabetical order.
 
 A rough outline of the revised idea:
 
-- General: shoot triple/bin at some triple/bin sys
-- Localized environment of space
-- Fixed host triplet/quintuplet system <- shoot some bin/triplet at the host from all points on a sphere
-- How many of these trails have pistol ejected -> prob
-- More likely to form in bin-bin-bin or tri-tri
-- Assume close encounter event of bin-bin-bin or tri-tri has happened in some cluster
-- Distant effect of other stars in the cluster -> trivial
+* General: shoot triple/bin at some triple/bin sys
+* Localized environment of space
+* Fixed host triplet/quintuplet system <- shoot some bin/triplet at the host from all points on a sphere
+* How many of these trails have pistol ejected -> prob
+* More likely to form in bin-bin-bin or tri-tri
+* Assume close encounter event of bin-bin-bin or tri-tri has happened in some cluster
+* Distant effect of other stars in the cluster -> trivial
 
 ### In detail
 
@@ -40,13 +52,13 @@ A rough outline of the revised idea:
 >
 > Input:
 >
-> - host_system_param(triplet or bin-bin) <- mass, velocity, location, separation, etc
-> - variable_system_param(triplet or bin) <- mass, velocity, location, separation, etc
+> * host_system_param(triplet or bin-bin) <- mass, velocity, location, separation, etc
+> * variable_system_param(triplet or bin) <- mass, velocity, location, separation, etc
 >
 > Output:\
 >
-> - ejection_flag(True or False)
-> - ejected_param(mass, velocity)
+> * ejection_flag(True or False)
+> * ejected_param(mass, velocity)
 >
 
 ## Grading rubric
@@ -55,7 +67,10 @@ A rough outline of the revised idea:
 
 ---
 
-## Legacy idea <- Documentation only
+## Archived
+
+<details>
+<summary>Read More...</summary>
 
 ### Steps
 
@@ -140,7 +155,7 @@ def sim(intermediate_param, time_step):
     gravity
     
     # hydro
-    if close_encouter:
+    if close_encounter:
         hydro()
         replace collide with new
     
@@ -163,7 +178,7 @@ def sim(intermediate_param, time_step):
 ```
 
 ```py
-def psudo_prob(num_true_flag, num_config): #????? -> MC? -> Literature
+def pseudo_prob(num_true_flag, num_config): #????? -> MC? -> Literature
     num_flag = num_true_flag
     return num_flag/num_config # prob of pistol inside selected number of configs
 ```
@@ -174,3 +189,5 @@ def plotter(args):
     plt.plot(args) # cmap with numbered output
     plt.save(f"cmap_{time}")
 ```
+
+<\details>
