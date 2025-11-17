@@ -1,70 +1,82 @@
-"""
-6-body encounter simulation combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
-"""
+from helpers import make_seba_stars
+from helpers import make_triple_binary_system
+from helpers import make_sph_from_two_stars
+from helpers import detect_close_pair
+from helpers import run_fi_collision
+from helpers import compute_remnant_spin
+from helpers import critical_velocity
+from helpers import outcomes
 
-# import
-import os
+
 import numpy as np
 
-from amuse.lab import *
+import matplotlib.pyplot as plt
+from matplotlib.animation import FuncAnimation, PillowWriter
+import matplotlib.cm as cm
+import matplotlib.colors as mcolors
+import os
 from amuse.units import units
+
+from amuse.lab import *
 from amuse.io import write_set_to_file, read_set_from_file
+
+# import libraries
+from amuse.community.fi.interface import Fi
 from amuse.datamodel import Particles
-
-from amuse.community.ph4.interface import ph4
-
-from src.strw_amuse.helpers import (
-    make_seba_stars,
-    make_triple_binary_system,
-    make_sph_from_two_stars,
-    detect_close_pair,
-    run_fi_collision,
-    # compute_remnant_spin,
-)
-
-
-from src.strw_amuse.config import (
-    OUTPUT_DIR_COLLISIONS,
-    OUTPUT_DIR_FINAL_STATES,
-    OUTPUT_DIR_LOGS,
-    OUTPUT_DIR_SNAPSHOTS,
-)
-
-# func repo
 
 
 def run_6_body_simulation(
-    age, masses, sep, ecc, direction, centers, v_coms, run_label=""
+    sep,
+    ecc,
+    direction,
+    v_coms,
+    orbit_plane,
+    impact_parameter,
+    distance,
+    masses=None,
+    centers=None,
+    age=None,
+    run_label="",
 ):
     """
-    Run a full 6-body simulation
-    Combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
+    Run a full 6-body simulation combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
 
-    1. Set up three binaries, evolves them under gravity, and applies stellar evolution through SEBA
-    2. Auto detect and resolve physical collisions between stars
-    3. When a collision is detected, invokes an Smoothed Particle Hydrodynamics calculation with Fi\
-        to simulate the merger and generate a realistic remnant with updated mass, radius,\
-        and velocity.
-    4. Collisions, pre/post states, and SPH outputs are saved to disk
+    This function sets up three binaries, evolves them under gravity, applies stellar evolution through SEBA,
+    and automatically detects and resolves physical collisions between stars.When a collision is detected,
+    the function invokes an SPH (Smoothed Particle Hydrodynamics) calculation using the Fi code to simulate
+    the merger and generate a realistic remnant with updated mass, radius, and velocity. Collisions, pre/post states,
+    and SPH outputs are saved to disk for later analysis.
 
     Parameters
     ----------
-    age : float
-        Initial stellar age in Myr, used for SEBA stellar evolution initialization.
-    masses : list of float
-        Masses (in MSun) of the six stars (two per binary).
     sep : list of float
         Initial semi-major axes (in AU) for each of the three binaries.
+        3 seperations for 3 binaries
     ecc : list of float
         Orbital eccentricities of the binaries.
+        3 eccentricities for 3 binaries
     direction : list of float
-        Common orientation vector for all binaries (defines orbital plane orientation).
+        orbital orientation for 2 incoming binaries. The other binary resides at rest at the origin.
+        default = 0 for the first binary, the other two are given by this input
     centers : list of 3-element lists
-        Positions (in AU) of each binary's center of mass in the simulation frame.
+        Positions (in AU) of 2 binary's center of mass in the simulation frame. The other binary resides at the origin.
+        default = [0,0,0] for the first binary, the other two are given by this input
     v_coms : list of 3-element lists
-        Center-of-mass velocities (in km/s) for each binary.
+        Center-of-mass velocities with respect to the escape velocity(in km/s) for 2 binaries. The other binary resides at rest at the origin.
+        default = [0,0,0] for the first binary, the other two are given by this input
+    orbit_plane : list of 3-element lists
+        Normal vectors defining the orbital planes for the two incoming binaries. The other binary resides in the xy-plane.
+        default = [0,0,1] for the first binary, the other two are given by this input
+    impact_parameter : list of float
+        Impact parameters (in AU) for the two incoming binaries relative to the target binary at the origin.
+        default = 0 for the first binary, the other two are given by this input
+    masses : list of float
+        Masses (in MSun) of the six stars (two per binary). If not provided, defaults to equal 50 MSun stars.
+    age : float
+        Initial age of the stars in Myr for stellar evolution setup. Defaults to 3.5 Myr.
     run_label : str, optional
         Label used to name output files for this specific simulation run.
+    Total of free parameters: 12 ( 3 sep, 3 ecc, 2 directions, 2 centers, 2 v_coms)
 
     Returns
     -------
@@ -77,48 +89,64 @@ def run_6_body_simulation(
 
     Notes
     -----
-    - Collisions are detected dynamically by comparing interstellar distances to stellar radii with 
-        a configurable buffer factor.
+    - Collisions are detected dynamically by comparing interstellar distances to stellar radii with a
+      configurable buffer factor.
     - SPH mergers are performed using Fi with automatic scaling of mass and size units to maintain
-        numerical stability.
+      numerical stability.
     - Each collision produces pre- and post-collision snapshots, and merged remnants are reinserted
-        into the N-body system with their new properties.
+      into the N-body system with their new properties.
     - If a collision fails or Fi crashes, the merger is skipped, and the system continues with
-        default remnant parameters.
+      default remnant parameters.
     - The simulation terminates if all stars are ejected or merged into a single object.
     """
 
     # Create directories
-    output_dirs = (
-        OUTPUT_DIR_COLLISIONS,
-        OUTPUT_DIR_FINAL_STATES,
-        OUTPUT_DIR_LOGS,
-        OUTPUT_DIR_SNAPSHOTS,
-    )
+    output_dirs = ["collisions", "final_states", "logs", "snapshots"]
     for d in output_dirs:
         if not os.path.exists(d):
             os.makedirs(d, exist_ok=True)
-
+    if age == None:
+        age = 3.5  # in Myr
     target_age = age | units.Myr
-    t_end = 2000 | units.yr
-    dt = 5 | units.yr
+    t_end = 100 | units.yr
+    dt = 0.1 | units.yr
     t = 0 | units.yr
 
     frames = []
     n_collision = 0
     last_collision_pair = None
+    if masses == None:
+        equal_50_mass = [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]  # in MSun
+        masses = equal_50_mass
+
+    # Default distance for centers
+    if centers == None:
+        centers = [
+            [0, 0, 0],
+            [distance[0], distance[0], distance[0]],
+            [distance[1], distance[1], distance[1]],
+        ]  # in AU
+
+    # shift centers based on impact parameters
+
+    v_crit = critical_velocity(masses, sep, ecc)
+    # Express input dimensionless velocities in physical units
+    v_coms[1] = [v_crit * v for v in v_coms[1]]
+    v_coms[2] = [v_crit * v for v in v_coms[2]]
 
     # Stellar evolution setup
     seba, seba_particles = make_seba_stars(masses, target_age)
     grav_particles = make_triple_binary_system(
-        masses, sep, ecc, direction, centers, v_coms
+        masses, sep, ecc, direction, orbit_plane, impact_parameter, centers, v_coms
     )
-
+    initial_particles = grav_particles.copy()
     total_mass = grav_particles.total_mass()
     length_scale = 1000 | units.AU
     converter = nbody_system.nbody_to_si(total_mass, length_scale)
     gravity = ph4(converter)
     gravity.particles.add_particles(grav_particles)
+
+    key_map = {g.key: s for g, s in zip(gravity.particles, seba.particles)}
 
     for g, s in zip(gravity.particles, seba.particles):
         g.mass = s.mass
@@ -128,6 +156,7 @@ def run_6_body_simulation(
 
     # Main evolution loop
     while t < t_end:
+
         t += dt
         gravity.evolve_model(t)
         seba.evolve_model(target_age + t)
@@ -143,12 +172,24 @@ def run_6_body_simulation(
                 f"Collision detected at {t.value_in(units.yr):.1f} yr between {i} and {j}"
             )
 
-            success, remnant = collision(i, j, n_collision, gravity, seba, t, run_label)
+            success, remnant = collision(
+                i, j, n_collision, gravity, seba, t, key_map, run_label
+            )
 
             if success:
+                # Save post-collision snapshot
                 post_snapshot = gravity.particles.copy()
                 frames.append(post_snapshot)
                 n_collision += 1
+
+                # Check if a remnant exists
+                if remnant is None:
+                    print(
+                        f"Destructive collision: terminating simulation at t = {t.value_in(units.yr):.1f} yr."
+                    )
+
+                    break
+                continue
 
     # BEFORE stopping gravity
     final_particles = gravity.particles.copy()
@@ -161,150 +202,205 @@ def run_6_body_simulation(
         max_mass_particle = None
         max_mass = 0 | units.MSun
         max_velocity = 0 | units.kms
+        # Save final system
+        final_filename = os.path.join("final_states", f"final_system_{run_label}.amuse")
+        write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+
+        return frames, max_mass, max_velocity
     else:
-        max_mass_particle = max(final_particles, key=lambda p: p.mass)
-        max_mass = max_mass_particle.mass
-        max_velocity = max_mass_particle.velocity.length()
+        if t < t_end:
+            outcome = outcomes(initial_particles, final_particles, max_mass=None)
+            # Save final system
+            final_filename = os.path.join(
+                "final_states", f"final_system_{run_label}.amuse"
+            )
+            write_set_to_file(
+                final_particles, final_filename, "amuse", overwrite_file=True
+            )
 
-        print(
-            f"Most massive star: Mass = {max_mass.value_in(units.MSun):.2f} MSun, "
-            f"Velocity = {max_velocity.value_in(units.kms):.2f} km/s"
-        )
+            return frames, None, None
+        else:
+            max_mass_particle = max(final_particles, key=lambda p: p.mass)
+            max_mass = max_mass_particle.mass
+            max_velocity = max_mass_particle.velocity.length()
 
-    # Save final system
-    final_filename = os.path.join(
-        OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
-    )
-    write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+            print(
+                f"Most massive star: Mass = {max_mass.value_in(units.MSun):.2f} MSun, "
+                f"Velocity = {max_velocity.value_in(units.kms):.2f} km/s"
+            )
 
-    return frames, max_mass, max_velocity
+            # Determine final outcome
+
+            outcome = outcomes(initial_particles, final_particles, max_mass)
+            print("Final outcome of the system:", outcome)
+
+            # Save final system
+            final_filename = os.path.join(
+                "final_states", f"final_system_{run_label}.amuse"
+            )
+            write_set_to_file(
+                final_particles, final_filename, "amuse", overwrite_file=True
+            )
+
+            return frames, max_mass, max_velocity, outcome
 
 
-def collision(i, j, n_collision, gravity, seba, t, run_label=""):
+# --- 2) Helper to find a seba particle by id ---
+def find_seba_by_id(seba_set, pid):
+    matches = [p for p in seba_set if getattr(p, "id", None) == pid]
+    return matches[0] if matches else None
+
+
+def find_seba_by_key(seba_set, key):
+    """Return the SEBA particle with the same AMUSE key, if it exists."""
+    for p in seba_set:
+        if p.key == key:
+            return p
+    return None
+
+
+def collision(i, j, n_collision, gravity, seba, t, key_map, run_label=""):
     """
-    Handle a single stellar collision event using Fi SPH and physically consistent remnant construction.
+    Handle a single stellar collision using Fi SPH and produce a bound remnant.
+    Safely removes original colliders from gravity and SEBA,
+    handles destructive collisions (very small remnants), and reinserts the remnant if appropriate.
     """
-
     try:
-        # --- Save pre-collision snapshot ---
-        pre_filename = os.path.join(
-            OUTPUT_DIR_COLLISIONS,
-            f"pre_collision_{n_collision}_{run_label}.amuse",
-        )
-        write_set_to_file(
-            gravity.particles.copy(), pre_filename, "amuse", overwrite_file=True
-        )
+        pre_particles = gravity.particles.copy()
+        # print("Pre-collision particles (key,mass):",
+        #      [(p.key, p.mass.value_in(units.MSun)) for p in pre_particles])
 
-        # --- Extract colliding stars ---
+        # Get colliding stars
         p_i = gravity.particles[i]
         p_j = gravity.particles[j]
+        # print(f"Collision between gravity indices {i},{j} -> keys {p_i.key},{p_j.key}; "
+        #      f"masses {p_i.mass.value_in(units.MSun):.2f}, {p_j.mass.value_in(units.MSun):.2f}")
 
-        # --- Build SPH initial conditions ---
+        # Build SPH initial conditions
         colliders = Particles()
         colliders.add_particle(p_i.copy())
         colliders.add_particle(p_j.copy())
-        sph = make_sph_from_two_stars(
-            colliders, n_sph_per_star=500
-        )  # adjust for performance
+        sph = make_sph_from_two_stars(colliders, n_sph_per_star=500)
 
+        # If SPH fails or empty, treat as destructive collision
         if len(sph) == 0:
-            print("Caution: SPH particle set empty — skipping.")
-            return False, None
+            print("⚠️ SPH particle set empty — treating as destructive collision.")
+            return remove_colliders(gravity, seba, key_map, p_i, p_j, destructive=True)
 
-        # Center on COM before Fi run
-        com_pos = sph.center_of_mass()
-        com_vel = sph.center_of_mass_velocity()
-        sph.position -= com_pos
-        sph.velocity -= com_vel
+        # Center SPH particles
+        sph.position -= sph.center_of_mass()
+        sph.velocity -= sph.center_of_mass_velocity()
 
-        # Save SPH input
+        # Save SPH initial state
         write_set_to_file(
             sph,
-            os.path.join(
-                OUTPUT_DIR_COLLISIONS,
-                f"collision_{n_collision}_sph_input_{run_label}.amuse",
-            ),
+            f"collisions/collision_{n_collision}_sph_input_{run_label}.amuse",
             "amuse",
             overwrite_file=True,
         )
 
-        # --- Run Fi hydrodynamics ---
+        # Run Fi
         gas_out, diag = run_fi_collision(sph, t_end=0.1 | units.yr)
         print("Fi collision done:", diag)
-        # map Fi output back to global coordinates
-        local_com_pos = gas_out.center_of_mass()
-        local_com_vel = gas_out.center_of_mass_velocity()
-        # compute global pair COM using progenitors (mass-weighted)
-        global_pair_com_pos = (p_i.mass * p_i.position + p_j.mass * p_j.position) / (
+
+        # Map SPH back to progenitor COM
+        progenitor_com_pos = (p_i.mass * p_i.position + p_j.mass * p_j.position) / (
             p_i.mass + p_j.mass
         )
-        global_pair_com_vel = (p_i.mass * p_i.velocity + p_j.mass * p_j.velocity) / (
+        progenitor_com_vel = (p_i.mass * p_i.velocity + p_j.mass * p_j.velocity) / (
             p_i.mass + p_j.mass
         )
+        gas_out.position += progenitor_com_pos - gas_out.center_of_mass()
+        gas_out.velocity += progenitor_com_vel - gas_out.center_of_mass_velocity()
 
-        gas_out.position += global_pair_com_pos - local_com_pos
-        gas_out.velocity += global_pair_com_vel - local_com_vel
-
-        # Save SPH output
-        write_set_to_file(
-            gas_out,
-            os.path.join(
-                OUTPUT_DIR_COLLISIONS,
-                f"collision_{n_collision}_sph_output_{run_label}.amuse",
-            ),
-            "amuse",
-            overwrite_file=True,
-        )
-
-        # --- Compute per-particle energies (approximate binding check) ---
+        # --- Bound particle selection ---
         com_pos = gas_out.center_of_mass()
         com_vel = gas_out.center_of_mass_velocity()
         r = gas_out.position - com_pos
         v = gas_out.velocity - com_vel
+        r_mag = r.lengths()
+        total_M = gas_out.total_mass()
+        phi = -(constants.G * total_M) / (r_mag + (1 | units.RSun))
+        E_spec = 0.5 * v.lengths() ** 2 + phi
+        bound_mask = E_spec.value_in(units.m**2 / units.s**2) < 0.0
 
-        phi = -(constants.G * gas_out.total_mass()) / (r.lengths() + (1 | units.RSun))
-        E_kin = 0.5 * v.lengths() ** 2
-        E_spec = E_kin + phi  # specific total energy (m²/s²)
-        bound_mask = E_spec < 0 | (units.m**2 / units.s**2)
+        if np.any(bound_mask):
+            bound_particles = gas_out[bound_mask]
+            Mbound = bound_particles.total_mass()
+            COM_pos = bound_particles.center_of_mass()
+            COM_vel = bound_particles.center_of_mass_velocity()
+            remnant_radius = (Mbound.value_in(units.MSun) ** 0.57) | units.RSun
+        else:
+            print("No bound particles found: destructive collision")
+            return remove_colliders(gravity, seba, key_map, p_i, p_j, destructive=True)
 
-        # ensure boolean array
-        bound_mask = np.array(bound_mask)
-        bound_indices = np.where(bound_mask)[0]
-        bound_particles = (
-            gas_out[bound_indices] if len(bound_indices) > 0 else gas_out.copy()
-        )
+        # --- Destructive collision check ---
+        if Mbound <= (5 | units.MSun):
+            print("⚠️ Very small remnant mass; treating as destructive collision")
+            remove_colliders(gravity, seba, key_map, p_i, p_j, destructive=True)
+            return True, None
 
-        if len(bound_particles) == 0:
-            print("Caution: No bound particles found; fallback to full SPH set.")
+        # --- Normal remnant creation ---
+        remnant = Particle()
+        remnant.mass = Mbound
+        remnant.radius = remnant_radius
+        remnant.position = COM_pos
+        remnant.velocity = COM_vel
 
-        # --- Compute remnant properties ---
-        Mbound = bound_particles.total_mass()
-        COM_pos = bound_particles.center_of_mass()
-        COM_vel = bound_particles.center_of_mass_velocity()
-
-        # Mass–radius relation
-        remnant_radius = (Mbound.value_in(units.MSun) ** 0.57) | units.RSun
-
-        # Momentum conservation using progenitor momenta
-        total_momentum = p_i.mass * p_i.velocity + p_j.mass * p_j.velocity
-        new_velocity = total_momentum / Mbound
-
-        # --- Replace star i with remnant, remove j ---
-        p_i.mass = Mbound
-        p_i.position = COM_pos
-        p_i.velocity = new_velocity
-        p_i.radius = remnant_radius
-
-        gravity.particles.remove_particle(p_j)
+        # Remove originals and add remnant
+        remove_colliders(gravity, seba, key_map, p_i, p_j, destructive=False)
+        gravity.particles.add_particle(remnant)
         gravity.recommit_particles()
+
+        # Add remnant to SEBA
+        remnant_seba = Particle()
+        remnant_seba.mass = remnant.mass
+        remnant_seba.radius = remnant.radius
+        remnant_seba.age = (3.5 | units.Myr) + t
+        seba.particles.add_particle(remnant_seba)
+        seba.recommit_particles()
+
+        key_map[remnant.key] = remnant_seba
 
         print(
             f"Collision {n_collision} processed: remnant = "
             f"{Mbound.value_in(units.MSun):.2f} M☉, R = {remnant_radius.value_in(units.RSun):.2f} R☉"
         )
-
-        return True, p_i
+        return True, remnant
 
     except Exception as e:
-        print(f"Collision handling failed: {e}")
+        print("⚠️ Collision handling failed with exception type:", type(e))
+        print("Exception details:", e)
         return False, None
+
+
+def remove_colliders(gravity, seba, key_map, p_i, p_j, destructive=True):
+    """
+    Safely remove colliding stars from gravity and SEBA.
+    If destructive is True, do not insert any remnant.
+    """
+    # Gravity removal
+    to_remove_grav = Particles()
+    for p in (p_i, p_j):
+        if p in gravity.particles:
+            to_remove_grav.add_particle(p)
+            key_map.pop(p.key, None)
+    if len(to_remove_grav) > 0:
+        gravity.particles.remove_particles(to_remove_grav)
+        gravity.recommit_particles()
+
+    # SEBA removal
+    to_remove_seba = Particles()
+    for p in (p_i, p_j):
+        # Look up SEBA particle by key instead of object identity
+        s_obj = next((s for s in seba.particles if s.key == p.key), None)
+        if s_obj is not None:
+            to_remove_seba.add_particle(s_obj)
+            key_map.pop(p.key, None)
+    if len(to_remove_seba) > 0:
+        seba.particles.remove_particles(to_remove_seba)
+        seba.recommit_particles()
+
+    if destructive:
+        return True, None
+    return True
