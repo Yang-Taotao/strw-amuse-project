@@ -1,21 +1,18 @@
+"""
+General helper functions for AMUSE simulation.
+"""
+
+# import
+from itertools import combinations
 import numpy as np
 
-
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
-import os
-from amuse.units import units
-
-from amuse.lab import *
-from amuse.io import write_set_to_file, read_set_from_file
-
-# import libraries
+from amuse.units import units, constants, nbody_system
+from amuse.units.quantities import VectorQuantity
 from amuse.community.fi.interface import Fi
-from amuse.datamodel import Particles
+from amuse.community.seba.interface import SeBa
+from amuse.datamodel import Particles, Particle
 
-from itertools import combinations
+# func repo
 
 
 def pairwise_separations(particles):
@@ -125,7 +122,7 @@ def make_sph_from_two_stars(stars, n_sph_per_star=100, u_value=None, pos_unit=un
         pos_unit=pos_unit,
     )
 
-    # shift to absolute positions
+    # shift to absolute positions <<- ATTENTION - Check if your instance of Particles are fully initialized AMUSE obj
     sph1.position += s1.position.in_(pos_unit)
     sph2.position += s2.position.in_(pos_unit)
 
@@ -185,23 +182,23 @@ def run_fi_collision(gas, t_end=0.1 | units.yr, min_mass=1e-6 | units.MSun):
 
 def compute_remnant_spin(gas):
     """
-    Compute mass, COM velocity, spin omega, and angular momentum of remnant.
+    Compute mass, com velocity, spin omega, and angular momentum of remnant.
     """
-    COM_pos = gas.center_of_mass()
-    COM_vel = gas.center_of_mass_velocity()
-    L = VectorQuantity([0.0, 0.0, 0.0], units.kg * units.m**2 / units.s)
-    I_scalar = 0.0 | units.kg * units.m**2
+    com_pos = gas.center_of_mass()
+    com_vel = gas.center_of_mass_velocity()
+    angular_momentum = VectorQuantity([0.0, 0.0, 0.0], units.kg * units.m**2 / units.s)
+    moment_of_inertia = 0.0 | units.kg * units.m**2
 
     for p in gas:
-        r = p.position - COM_pos
-        v = p.velocity - COM_vel
-        L += p.mass * r.cross(v)
-        I_scalar += p.mass * r.length() ** 2
+        r = p.position - com_pos
+        v = p.velocity - com_vel
+        angular_momentum += p.mass * r.cross(v)
+        moment_of_inertia += p.mass * r.length() ** 2
 
-    omega = (L.length() / I_scalar).in_(1 / units.s)
-    Mbound = gas.total_mass()
-    Vcom = COM_vel.in_(units.kms)
-    return Mbound, Vcom, omega, L
+    omega = (angular_momentum.length() / moment_of_inertia).in_(1 / units.s)
+    m_bound = gas.total_mass()
+    v_com = com_vel.in_(units.kms)
+    return m_bound, v_com, omega, angular_momentum
 
 
 def make_triple_binary_system(
@@ -224,52 +221,52 @@ def make_triple_binary_system(
     # Default centers
     if centers is None:
         centers = [[-300, 0, 0], [300, 0, 0], [0, 600, 0]]
-    # Default COM velocities
+    # Default com velocities
     if v_coms is None:
         v_coms = [[10.0, 0.0, 0.0], [-10.0, 0.0, 0.0], [0.0, -10.0, 0.0]]
 
     ma1, ma2, mb1, mb2, mc1, mc2 = masses
-    sepA, sepB, sepC = seps
-    dirA, dirB, dirC = directions
-    eccA, eccB, eccC = ecc
+    sep_a, sep_b, sep_c = seps
+    dir_a, dir_b, dir_c = directions
+    ecc_a, ecc_b, ecc_c = ecc
 
     # Convert centers and velocities to VectorQuantity with units
-    centerA = VectorQuantity(centers[0], units.AU)
-    centerB = VectorQuantity(centers[1], units.AU)
-    centerC = VectorQuantity(centers[2], units.AU)
+    center_a = VectorQuantity(centers[0], units.AU)
+    center_b = VectorQuantity(centers[1], units.AU)
+    center_c = VectorQuantity(centers[2], units.AU)
 
-    v_com_A = VectorQuantity(v_coms[0], units.kms)
-    v_com_B = VectorQuantity(v_coms[1], units.kms)
-    v_com_C = VectorQuantity(v_coms[2], units.kms)
+    v_com_a = VectorQuantity(v_coms[0], units.kms)
+    v_com_b = VectorQuantity(v_coms[1], units.kms)
+    v_com_c = VectorQuantity(v_coms[2], units.kms)
 
     # Create binaries
     p1, p2 = make_binary(
         ma1,
         ma2,
-        sepA | units.AU,
-        eccA,
-        center=centerA,
-        direction=dirA,
+        sep_a | units.AU,
+        ecc_a,
+        center=center_a,
+        direction=dir_a,
         orbit_plane=orbit_plane[0],
         impact_parameter=0.0,
     )
     p3, p4 = make_binary(
         mb1,
         mb2,
-        sepB | units.AU,
-        eccB,
-        center=centerB,
-        direction=dirB,
+        sep_b | units.AU,
+        ecc_b,
+        center=center_b,
+        direction=dir_b,
         orbit_plane=orbit_plane[1],
         impact_parameter=impact_parameter[0],
     )
     p5, p6 = make_binary(
         mc1,
         mc2,
-        sepC | units.AU,
-        eccC,
-        center=centerC,
-        direction=dirC,
+        sep_c | units.AU,
+        ecc_c,
+        center=center_c,
+        direction=dir_c,
         orbit_plane=orbit_plane[2],
         impact_parameter=impact_parameter[1],
     )
@@ -279,13 +276,13 @@ def make_triple_binary_system(
     p3.name, p4.name = "B1", "B2"
     p5.name, p6.name = "C1", "C2"
 
-    # Apply COM velocities
+    # Apply com velocities
     for p in (p1, p2):
-        p.velocity += v_com_A
+        p.velocity += v_com_a
     for p in (p3, p4):
-        p.velocity += v_com_B
+        p.velocity += v_com_b
     for p in (p5, p6):
-        p.velocity += v_com_C
+        p.velocity += v_com_c
 
     # Combine all particles
     particles = Particles()
@@ -342,8 +339,8 @@ def make_binary(
     off_set_dir /= np.linalg.norm(off_set_dir)
     # Rotate offset direction by given angle around plane normal
     c2, s2 = np.cos(direction), np.sin(direction)
-    R_dir = np.array([[c2, -s2, 0], [s2, c2, 0], [0, 0, 1]])
-    off_set_dir = np.dot(R_dir, off_set_dir)
+    r_dir = np.array([[c2, -s2, 0], [s2, c2, 0], [0, 0, 1]])
+    off_set_dir = np.dot(r_dir, off_set_dir)
 
     m1 = m1 | units.MSun
     m2 = m2 | units.MSun
@@ -394,24 +391,24 @@ def make_binary(
     c = np.dot(z_axis, n)
 
     if s == 0:  # already aligned
-        R_plane = np.eye(3)
+        r_plane = np.eye(3)
         if c < 0:  # opposite direction
-            R_plane = -np.eye(3)
+            r_plane = -np.eye(3)
     else:
         vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-        R_plane = np.eye(3) + vx + np.matmul(vx, vx) * ((1 - c) / (s**2))
+        r_plane = np.eye(3) + vx + np.matmul(vx, vx) * ((1 - c) / (s**2))
 
     # Additional rotation around orbit normal
     c2, s2 = np.cos(direction), np.sin(direction)
-    R_dir = np.array([[c2, -s2, 0], [s2, c2, 0], [0, 0, 1]])
+    r_dir = np.array([[c2, -s2, 0], [s2, c2, 0], [0, 0, 1]])
 
     # Total rotation
-    R_total = np.dot(R_plane, R_dir)
+    r_total = np.dot(r_plane, r_dir)
 
-    pos1 = np.dot(R_total, pos1_base) | units.AU
-    pos2 = np.dot(R_total, pos2_base) | units.AU
-    vel1 = np.dot(R_total, vel1_base) | units.kms
-    vel2 = np.dot(R_total, vel2_base) | units.kms
+    pos1 = np.dot(r_total, pos1_base) | units.AU
+    pos2 = np.dot(r_total, pos2_base) | units.AU
+    vel1 = np.dot(r_total, vel1_base) | units.kms
+    vel2 = np.dot(r_total, vel2_base) | units.kms
 
     # Create particles
     p1 = Particle(mass=m1)
@@ -460,6 +457,7 @@ def critical_velocity(masses, sep, ecc):
         units.AU**3 / (units.MSun * units.day**2)
     )  # AU^3 / (MSun * day^2)
     G = G.value_in(units.kms**2 * units.AU / units.MSun)  # km^2/s^2 * AU / MSun
+    # === <<- section in between can be vectorized
     m1, m2, m3, m4, m5, m6 = masses
     a1, a2, a3 = sep
     e1, e2, e3 = ecc
@@ -467,12 +465,13 @@ def critical_velocity(masses, sep, ecc):
     mu1 = (m1 * m2) / (m1 + m2)
     mu2 = (m3 * m4) / (m3 + m4)
     mu3 = (m5 * m6) / (m5 + m6)
+    # === <<- section in between can be vectorized
 
-    E1 = -G * m1 * m2 / (2 * a1 * (1 - e1**2))
-    E2 = -G * m3 * m4 / (2 * a2 * (1 - e2**2))
-    E3 = -G * m5 * m6 / (2 * a3 * (1 - e3**2))
+    energy_1 = -G * m1 * m2 / (2 * a1 * (1 - e1**2))
+    energy_2 = -G * m3 * m4 / (2 * a2 * (1 - e2**2))
+    energy_3 = -G * m5 * m6 / (2 * a3 * (1 - e3**2))
 
-    total_energy = E1 + E2 + E3
+    total_energy = energy_1 + energy_2 + energy_3
     reduced_mass = (mu1 * mu2) / (mu1 + mu2 + mu3)
 
     v_crit = np.sqrt(-2 * total_energy / reduced_mass)  # in km/s
@@ -496,10 +495,9 @@ def outcomes(initial_particles, final_particles, max_mass=None):
     tuple
         (outcome_label:str, descriptive_text:str)
     """
-    from amuse.units import units, constants
 
     # --- Helper function ---
-    def is_bound_system(particles):
+    def is_bound_system(particles):  # <<- ATTENTION
         """Return True if any pair of particles is gravitationally bound."""
         if len(particles) < 2:
             return False
@@ -509,8 +507,8 @@ def outcomes(initial_particles, final_particles, max_mass=None):
                 v_vec = p_i.velocity - p_j.velocity
                 r = r_vec.length()
                 v = v_vec.length()
-                E_spec = 0.5 * v**2 - constants.G * (p_i.mass + p_j.mass) / r
-                if E_spec < 0 | (units.m**2 / units.s**2):
+                e_spec = 0.5 * v**2 - constants.G * (p_i.mass + p_j.mass) / r
+                if e_spec < 0 | (units.m**2 / units.s**2):
                     return True
         return False
 

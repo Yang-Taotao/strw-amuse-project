@@ -1,28 +1,38 @@
-from helpers import make_seba_stars
-from helpers import make_triple_binary_system
-from helpers import make_sph_from_two_stars
-from helpers import detect_close_pair
-from helpers import run_fi_collision
-from helpers import compute_remnant_spin
-from helpers import critical_velocity
-from helpers import outcomes
+"""
+Main simulation functions for 6-body encounter simulation.
+Combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
+"""
 
-
+# imports
+import os
 import numpy as np
 
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
-import os
-from amuse.units import units
+# from amuse.lab import *
 
-from amuse.lab import *
-from amuse.io import write_set_to_file, read_set_from_file
+from amuse.units import units, nbody_system, constants
+from amuse.community.ph4.interface import ph4
+from amuse.io import write_set_to_file  # , read_set_from_file
+from amuse.datamodel import Particle, Particles
 
-# import libraries
-from amuse.community.fi.interface import Fi
-from amuse.datamodel import Particles
+from src.strw_amuse.helpers import (
+    make_seba_stars,
+    make_triple_binary_system,
+    make_sph_from_two_stars,
+    detect_close_pair,
+    run_fi_collision,
+    critical_velocity,
+    outcomes,
+    # compute_remnant_spin,
+)
+
+from src.strw_amuse.config import (
+    OUTPUT_DIR_COLLISIONS,
+    OUTPUT_DIR_FINAL_STATES,
+    OUTPUT_DIR_LOGS,
+    OUTPUT_DIR_SNAPSHOTS,
+)
+
+# func repo
 
 
 def run_6_body_simulation(
@@ -33,9 +43,9 @@ def run_6_body_simulation(
     orbit_plane,
     impact_parameter,
     distance,
-    masses=None,
+    masses=[50.0, 50.0, 50.0, 50.0, 50.0, 50.0],
     centers=None,
-    age=None,
+    age=3.5,
     run_label="",
 ):
     """
@@ -100,27 +110,30 @@ def run_6_body_simulation(
     - The simulation terminates if all stars are ejected or merged into a single object.
     """
 
-    # Create directories
-    output_dirs = ["collisions", "final_states", "logs", "snapshots"]
+    # create directories
+    output_dirs = (
+        OUTPUT_DIR_COLLISIONS,
+        OUTPUT_DIR_FINAL_STATES,
+        OUTPUT_DIR_LOGS,
+        OUTPUT_DIR_SNAPSHOTS,
+    )
     for d in output_dirs:
         if not os.path.exists(d):
             os.makedirs(d, exist_ok=True)
-    if age == None:
-        age = 3.5  # in Myr
+
+    # set units
     target_age = age | units.Myr
     t_end = 100 | units.yr
     dt = 0.1 | units.yr
     t = 0 | units.yr
 
+    # local init
     frames = []
     n_collision = 0
-    last_collision_pair = None
-    if masses == None:
-        equal_50_mass = [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]  # in MSun
-        masses = equal_50_mass
+    # last_collision_pair = None
 
-    # Default distance for centers
-    if centers == None:
+    # default distance for centers
+    if centers is None:
         centers = [
             [0, 0, 0],
             [distance[0], distance[0], distance[0]],
@@ -128,9 +141,8 @@ def run_6_body_simulation(
         ]  # in AU
 
     # shift centers based on impact parameters
-
     v_crit = critical_velocity(masses, sep, ecc)
-    # Express input dimensionless velocities in physical units
+    # Express input dimensionless velocities in physical units <<- !ATTENTION: NEED VECTORIZATION!
     v_coms[1] = [v_crit * v for v in v_coms[1]]
     v_coms[2] = [v_crit * v for v in v_coms[2]]
 
@@ -185,7 +197,7 @@ def run_6_body_simulation(
                 # Check if a remnant exists
                 if remnant is None:
                     print(
-                        f"Destructive collision: terminating simulation at t = {t.value_in(units.yr):.1f} yr."
+                        f"Destructive collision: sim ended at t = {t.value_in(units.yr):.1f} yr."
                     )
 
                     break
@@ -203,22 +215,24 @@ def run_6_body_simulation(
         max_mass = 0 | units.MSun
         max_velocity = 0 | units.kms
         # Save final system
-        final_filename = os.path.join("final_states", f"final_system_{run_label}.amuse")
+        final_filename = os.path.join(
+            OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
+        )
         write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
 
-        return frames, max_mass, max_velocity
+        return frames
     else:
         if t < t_end:
             outcome = outcomes(initial_particles, final_particles, max_mass=None)
             # Save final system
             final_filename = os.path.join(
-                "final_states", f"final_system_{run_label}.amuse"
+                OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
             )
             write_set_to_file(
                 final_particles, final_filename, "amuse", overwrite_file=True
             )
 
-            return frames, None, None
+            return frames
         else:
             max_mass_particle = max(final_particles, key=lambda p: p.mass)
             max_mass = max_mass_particle.mass
@@ -236,18 +250,18 @@ def run_6_body_simulation(
 
             # Save final system
             final_filename = os.path.join(
-                "final_states", f"final_system_{run_label}.amuse"
+                OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
             )
             write_set_to_file(
                 final_particles, final_filename, "amuse", overwrite_file=True
             )
 
-            return frames, max_mass, max_velocity, outcome
+            return frames
 
 
 # --- 2) Helper to find a seba particle by id ---
 def find_seba_by_id(seba_set, pid):
-    matches = [p for p in seba_set if getattr(p, "id", None) == pid]
+    matches = [p for p in seba_set if getattr(p, "id", None) == pid]  # <<- ATTENTION
     return matches[0] if matches else None
 
 
@@ -287,14 +301,18 @@ def collision(i, j, n_collision, gravity, seba, t, key_map, run_label=""):
             print("⚠️ SPH particle set empty — treating as destructive collision.")
             return remove_colliders(gravity, seba, key_map, p_i, p_j, destructive=True)
 
-        # Center SPH particles
+        # Center SPH particles <<- ATTENTION
         sph.position -= sph.center_of_mass()
         sph.velocity -= sph.center_of_mass_velocity()
 
         # Save SPH initial state
+        final_filename = os.path.join(
+            OUTPUT_DIR_COLLISIONS,
+            f"collision_{n_collision}_sph_input_{run_label}.amuse",
+        )
         write_set_to_file(
             sph,
-            f"collisions/collision_{n_collision}_sph_input_{run_label}.amuse",
+            final_filename,
             "amuse",
             overwrite_file=True,
         )
@@ -319,33 +337,33 @@ def collision(i, j, n_collision, gravity, seba, t, key_map, run_label=""):
         r = gas_out.position - com_pos
         v = gas_out.velocity - com_vel
         r_mag = r.lengths()
-        total_M = gas_out.total_mass()
-        phi = -(constants.G * total_M) / (r_mag + (1 | units.RSun))
-        E_spec = 0.5 * v.lengths() ** 2 + phi
-        bound_mask = E_spec.value_in(units.m**2 / units.s**2) < 0.0
+        m_total = gas_out.total_mass()
+        phi = -(constants.G * m_total) / (r_mag + (1 | units.RSun))
+        e_spec = 0.5 * v.lengths() ** 2 + phi
+        bound_mask = e_spec.value_in(units.m**2 / units.s**2) < 0.0
 
         if np.any(bound_mask):
             bound_particles = gas_out[bound_mask]
-            Mbound = bound_particles.total_mass()
-            COM_pos = bound_particles.center_of_mass()
-            COM_vel = bound_particles.center_of_mass_velocity()
-            remnant_radius = (Mbound.value_in(units.MSun) ** 0.57) | units.RSun
+            m_bound = bound_particles.total_mass()
+            com_pos = bound_particles.center_of_mass()
+            com_vel = bound_particles.center_of_mass_velocity()
+            remnant_radius = (m_bound.value_in(units.MSun) ** 0.57) | units.RSun
         else:
             print("No bound particles found: destructive collision")
             return remove_colliders(gravity, seba, key_map, p_i, p_j, destructive=True)
 
         # --- Destructive collision check ---
-        if Mbound <= (5 | units.MSun):
+        if m_bound <= (5 | units.MSun):
             print("⚠️ Very small remnant mass; treating as destructive collision")
             remove_colliders(gravity, seba, key_map, p_i, p_j, destructive=True)
             return True, None
 
         # --- Normal remnant creation ---
         remnant = Particle()
-        remnant.mass = Mbound
+        remnant.mass = m_bound
         remnant.radius = remnant_radius
-        remnant.position = COM_pos
-        remnant.velocity = COM_vel
+        remnant.position = com_pos
+        remnant.velocity = com_vel
 
         # Remove originals and add remnant
         remove_colliders(gravity, seba, key_map, p_i, p_j, destructive=False)
@@ -364,7 +382,7 @@ def collision(i, j, n_collision, gravity, seba, t, key_map, run_label=""):
 
         print(
             f"Collision {n_collision} processed: remnant = "
-            f"{Mbound.value_in(units.MSun):.2f} M☉, R = {remnant_radius.value_in(units.RSun):.2f} R☉"
+            f"{m_bound.value_in(units.MSun):.2f} M☉, R = {remnant_radius.value_in(units.RSun):.2f} R☉"
         )
         return True, remnant
 

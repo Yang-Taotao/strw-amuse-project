@@ -1,13 +1,19 @@
-# import librarie
+"""
+Plotting utilities for AMUSE simulation.
+"""
 
-
+# import
+import os
 import numpy as np
 import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
-import matplotlib.cm as cm
 import matplotlib.colors as mcolors
-import os
+from matplotlib.animation import FuncAnimation, PillowWriter
+
 from amuse.units import units
+
+from src.strw_amuse.config import OUTPUT_DIR_GIF, OUTPUT_DIR_IMG
+
+# func repo
 
 
 def visualize_frames(frames, run_label="test"):
@@ -20,10 +26,11 @@ def visualize_frames(frames, run_label="test"):
     """
 
     if len(frames) == 0:
-        print("⚠️ No frames provided.")
-        return
+        print("Warning: No frames provided.")
+        return None
 
-    os.makedirs("Gif-6body", exist_ok=True)
+    output_dir = OUTPUT_DIR_GIF
+    os.makedirs(output_dir, exist_ok=True)
 
     # --- Gather all masses for color normalization ---
     all_masses = np.array([p.mass.value_in(units.MSun) for f in frames for p in f])
@@ -40,11 +47,13 @@ def visualize_frames(frames, run_label="test"):
     final_masses = np.array([p.mass.value_in(units.MSun) for p in final_frame])
     max_index = np.argmax(final_masses)
     print(
-        f"Tracking most massive star (index {max_index}) with final mass {final_masses[max_index]:.2f} M☉"
+        f"Tracking heaviest star (idx {max_index}), final mass {final_masses[max_index]:.2f} M☉"
     )
 
-    # Extract its position at each frame (to recenter) and handle frames with different particle counts:
-    # Prefer the same index when possible, otherwise pick the nearest particle to the final tracked star position.
+    # Extract its position at each frame (to recenter)
+    # and handle frames with different particle counts:
+    # Prefer the same index when possible
+    # otherwise pick the nearest particle to the final tracked star position.
     final_particle = final_frame[max_index]
     final_pos = np.array(
         [final_particle.x.value_in(units.AU), final_particle.y.value_in(units.AU)]
@@ -139,16 +148,17 @@ def visualize_frames(frames, run_label="test"):
         repeat=False,
     )
 
-    gif_filename = os.path.join("Gif-6body", f"encounter_evolution_{run_label}.gif")
+    gif_filename = os.path.join(OUTPUT_DIR_GIF, f"encounter_evolution_{run_label}.gif")
     writer = PillowWriter(fps=10)
     ani.save(gif_filename, writer=writer)
 
-    print(f"🎬 GIF saved as {gif_filename}")
+    print(f"GIF saved as {gif_filename}")
     plt.close(fig)
-    return
+
+    return None
 
 
-def visualize_initial_final_frames(frames, init_params, collision, label=""):
+def visualize_initial_final_frames(frames, run_label="test"):
     """
     Clean visualization of initial vs final simulation frames.
     Includes:
@@ -156,21 +166,15 @@ def visualize_initial_final_frames(frames, init_params, collision, label=""):
     - Final-frame trajectories of all surviving stars over all time
     - Robust handling of mergers (missing particles)
     """
-
-    import os
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import matplotlib.colors as mcolors
-    from amuse.units import units
-
     # ---------------------------------------------------------
     # 0. Safety checks
     # ---------------------------------------------------------
     if len(frames) == 0:
-        print("⚠️ No frames provided.")
+        print("Warning: No frames provided.")
         return
 
-    os.makedirs("Gif-6body", exist_ok=True)
+    output_dir = OUTPUT_DIR_GIF
+    os.makedirs(output_dir, exist_ok=True)
 
     initial = frames[0]
     final = frames[-1]
@@ -369,6 +373,10 @@ def visualize_initial_final_frames(frames, init_params, collision, label=""):
     # ---------------------------------------------------------
     # 11. Final layout
     # ---------------------------------------------------------
-    plt.suptitle(f"Initial and Final Frames: {label}", fontsize=16)
+    plt.suptitle(f"Initial and Final Frames: {run_label}", fontsize=16)
 
-    plt.show()
+    png_filename = os.path.join(OUTPUT_DIR_IMG, f"encounter_evolution_{run_label}.png")
+    print(f"Comparison png saved as {png_filename}")
+    plt.close(fig)
+
+    return None
