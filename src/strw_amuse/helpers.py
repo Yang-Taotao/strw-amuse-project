@@ -12,6 +12,7 @@ from amuse.community.fi.interface import Fi
 from amuse.community.seba.interface import SeBa
 from amuse.datamodel import Particles, Particle
 
+
 # func repo
 
 
@@ -24,7 +25,7 @@ def pairwise_separations(particles):
     return pairs
 
 
-def detect_close_pair(particles, radii, buffer_factor=0.4):
+def detect_close_pair(particles, radii, buffer_factor=2):
     """
     Detects the first close pair based on radii overlap with a simple buffer.
     Returns (i, j, sep) or None.
@@ -210,6 +211,8 @@ def make_triple_binary_system(
     impact_parameter,
     centers=None,
     v_coms=None,
+    phases=None,  # true anomalies
+    psi=None,  # impact orientation for incoming binaries
 ):
     """
     Create a system of three interacting binaries with fully tunable parameters.
@@ -221,23 +224,23 @@ def make_triple_binary_system(
     # Default centers
     if centers is None:
         centers = [[-300, 0, 0], [300, 0, 0], [0, 600, 0]]
-    # Default com velocities
     if v_coms is None:
-        v_coms = [[10.0, 0.0, 0.0], [-10.0, 0.0, 0.0], [0.0, -10.0, 0.0]]
+        v_coms = [[0, 0, 0], [10, 0, 0], [-10, 0, 0]]  # first binary at rest
+    if phases is None:
+        phases = [0.0, 0.0, 0.0]
+    if psi is None:
+        psi = [0.0, 0.0, 0.0]
 
     ma1, ma2, mb1, mb2, mc1, mc2 = masses
     sep_a, sep_b, sep_c = seps
     dir_a, dir_b, dir_c = directions
     ecc_a, ecc_b, ecc_c = ecc
+    f_a, f_b, f_c = phases
+    psi_b, psi_c = psi
 
-    # Convert centers and velocities to VectorQuantity with units
-    center_a = VectorQuantity(centers[0], units.AU)
-    center_b = VectorQuantity(centers[1], units.AU)
-    center_c = VectorQuantity(centers[2], units.AU)
-
-    v_com_a = VectorQuantity(v_coms[0], units.kms)
-    v_com_b = VectorQuantity(v_coms[1], units.kms)
-    v_com_c = VectorQuantity(v_coms[2], units.kms)
+    # Convert centers and velocities to VectorQuantity
+    centers_q = [VectorQuantity(c, units.AU) for c in centers]
+    v_coms_q = [VectorQuantity(v, units.kms) for v in v_coms]
 
     # Create binaries
     p1, p2 = make_binary(
@@ -245,30 +248,35 @@ def make_triple_binary_system(
         ma2,
         sep_a | units.AU,
         ecc_a,
-        center=center_a,
+        center=centers_q[0],
         direction=dir_a,
-        orbit_plane=orbit_plane[0],
-        impact_parameter=0.0,
+        orbit_plane=[0, 0, 1],
+        impact_parameter=0.0 | units.AU,
+        f=f_a,
     )
     p3, p4 = make_binary(
         mb1,
         mb2,
         sep_b | units.AU,
         ecc_b,
-        center=center_b,
+        center=centers_q[1],
         direction=dir_b,
-        orbit_plane=orbit_plane[1],
-        impact_parameter=impact_parameter[0],
+        orbit_plane=orbit_plane[0],
+        impact_parameter=impact_parameter[0] | units.AU,
+        f=f_b,
+        psi=psi_b,
     )
     p5, p6 = make_binary(
         mc1,
         mc2,
         sep_c | units.AU,
         ecc_c,
-        center=center_c,
+        center=centers_q[2],
         direction=dir_c,
-        orbit_plane=orbit_plane[2],
-        impact_parameter=impact_parameter[1],
+        orbit_plane=orbit_plane[1],
+        impact_parameter=impact_parameter[1] | units.AU,
+        f=f_c,
+        psi=psi_c,
     )
 
     # Name particles
@@ -276,13 +284,13 @@ def make_triple_binary_system(
     p3.name, p4.name = "B1", "B2"
     p5.name, p6.name = "C1", "C2"
 
-    # Apply com velocities
+    # Apply center-of-mass velocities
     for p in (p1, p2):
-        p.velocity += v_com_a
+        p.velocity += v_coms_q[0]
     for p in (p3, p4):
-        p.velocity += v_com_b
+        p.velocity += v_coms_q[1]
     for p in (p5, p6):
-        p.velocity += v_com_c
+        p.velocity += v_coms_q[2]
 
     # Combine all particles
     particles = Particles()
@@ -300,36 +308,18 @@ def make_binary(
     center=None,
     direction=0.0,
     orbit_plane=[0, 0, 1],
-    impact_parameter=0.0,
+    impact_parameter=0.0 | units.AU,
+    f=0.0,  # true anomaly
+    psi=0.0,  # impact orientation
 ):
     """
-    Create a binary system with arbitrary eccentricity and orientation.
-
-    Parameters
-    ----------
-    m1, m2 : float or Quantity
-        Masses in Msun.
-    a : Quantity
-        Semi-major axis (AU).
-    e : float
-        Eccentricity (0=circular, 0<e<1=elliptical).
-    center : VectorQuantity or list
-        Center-of-mass position (default: [0,0,0] AU).
-    direction : float
-        Rotation angle around orbit normal vector (radians).
-    orbit_plane : list of 3 floats
-        Normal vector defining orbital plane. Default: z-axis.
-
-    Returns
-    -------
-    p1, p2 : Particle
-        Two AMUSE particles with positions and velocities.
+    Create a binary system with arbitrary eccentricity, orbit plane, phase, and impact orientation.
     """
-    # direction is a rotation angle (radians)
+
     plane = np.array(orbit_plane, dtype=float)
     plane /= np.linalg.norm(plane)
 
-    # Choose a reference axis perpendicular to orbit normal (e.g., x-axis if not parallel)
+    # Reference vector perpendicular to orbit plane
     ref = (
         np.array([1, 0, 0])
         if abs(np.dot(plane, [1, 0, 0])) < 0.9
@@ -337,33 +327,28 @@ def make_binary(
     )
     off_set_dir = np.cross(plane, ref)
     off_set_dir /= np.linalg.norm(off_set_dir)
-    # Rotate offset direction by given angle around plane normal
-    c2, s2 = np.cos(direction), np.sin(direction)
+
+    # Rotate offset by direction and psi
+    c2, s2 = np.cos(direction + psi), np.sin(direction + psi)
     r_dir = np.array([[c2, -s2, 0], [s2, c2, 0], [0, 0, 1]])
     off_set_dir = np.dot(r_dir, off_set_dir)
 
+    # Masses
     m1 = m1 | units.MSun
     m2 = m2 | units.MSun
     total_mass = m1 + m2
-    if impact_parameter is None:
-        impact_parameter = 0.0 | units.AU
-    else:
-        impact_parameter = impact_parameter | units.AU
-    # Default center
-    if center is None:
-        center = VectorQuantity([0, 0, 0], units.AU)
-        # offset centers by impact parameter along offset direction
-        center = center + off_set_dir * impact_parameter
-    elif not isinstance(center, VectorQuantity):
-        center = VectorQuantity(center, units.AU)
-        center = center + off_set_dir * impact_parameter
 
-    # Separation at pericenter
-    r_rel = a * (1 - e)
+    # Center including impact parameter along offset
+    if not isinstance(center, VectorQuantity):
+        center = VectorQuantity(center, units.AU)
+    center += off_set_dir * impact_parameter
+
+    # Positions using true anomaly f
+    r_rel = a * (1 - e**2) / (1 + e * np.cos(f))
     r1 = -(m2 / total_mass) * r_rel
     r2 = (m1 / total_mass) * r_rel
 
-    # Circular or elliptical orbit velocity
+    # Orbital velocities
     if e == 0.0:
         v_rel = (constants.G * total_mass / a) ** 0.5
     elif e < 1.0:
@@ -374,35 +359,40 @@ def make_binary(
     v1 = +(m2 / total_mass) * v_rel
     v2 = -(m1 / total_mass) * v_rel
 
-    # Base positions and velocities in XY plane
-    pos1_base = np.array([r1.value_in(units.AU), 0.0, 0.0])
-    pos2_base = np.array([r2.value_in(units.AU), 0.0, 0.0])
-    vel1_base = np.array([0.0, v1.value_in(units.kms), 0.0])
-    vel2_base = np.array([0.0, v2.value_in(units.kms), 0.0])
+    # Base positions and velocities in XY plane with phase rotation
+    pos1_base = np.array(
+        [r1.value_in(units.AU) * np.cos(f), r1.value_in(units.AU) * np.sin(f), 0.0]
+    )
+    pos2_base = np.array(
+        [r2.value_in(units.AU) * np.cos(f), r2.value_in(units.AU) * np.sin(f), 0.0]
+    )
+    vel1_base = np.array(
+        [-v1.value_in(units.kms) * np.sin(f), v1.value_in(units.kms) * np.cos(f), 0.0]
+    )
+    vel2_base = np.array(
+        [-v2.value_in(units.kms) * np.sin(f), v2.value_in(units.kms) * np.cos(f), 0.0]
+    )
 
-    # Normalize orbit_plane
-    n = np.array(orbit_plane, dtype=float)
-    n /= np.linalg.norm(n)
-
-    # Rotation to align Z-axis with orbit normal
+    # Rotate to orbit plane
+    n = plane
     z_axis = np.array([0.0, 0.0, 1.0])
-    v = np.cross(z_axis, n)
-    s = np.linalg.norm(v)
+    v_cross = np.cross(z_axis, n)
+    s = np.linalg.norm(v_cross)
     c = np.dot(z_axis, n)
-
-    if s == 0:  # already aligned
-        r_plane = np.eye(3)
-        if c < 0:  # opposite direction
-            r_plane = -np.eye(3)
+    if s == 0:
+        r_plane = np.eye(3) if c > 0 else -np.eye(3)
     else:
-        vx = np.array([[0, -v[2], v[1]], [v[2], 0, -v[0]], [-v[1], v[0], 0]])
-        r_plane = np.eye(3) + vx + np.matmul(vx, vx) * ((1 - c) / (s**2))
+        vx = np.array(
+            [
+                [0, -v_cross[2], v_cross[1]],
+                [v_cross[2], 0, -v_cross[0]],
+                [-v_cross[1], v_cross[0], 0],
+            ]
+        )
+        r_plane = np.eye(3) + vx + np.matmul(vx, vx) * ((1 - c) / s**2)
 
-    # Additional rotation around orbit normal
     c2, s2 = np.cos(direction), np.sin(direction)
     r_dir = np.array([[c2, -s2, 0], [s2, c2, 0], [0, 0, 1]])
-
-    # Total rotation
     r_total = np.dot(r_plane, r_dir)
 
     pos1 = np.dot(r_total, pos1_base) | units.AU
@@ -410,7 +400,6 @@ def make_binary(
     vel1 = np.dot(r_total, vel1_base) | units.kms
     vel2 = np.dot(r_total, vel2_base) | units.kms
 
-    # Create particles
     p1 = Particle(mass=m1)
     p2 = Particle(mass=m2)
     p1.position = center + pos1
@@ -479,75 +468,252 @@ def critical_velocity(masses, sep, ecc):
     return v_crit
 
 
-def outcomes(initial_particles, final_particles, max_mass=None):
+from amuse.units import units, constants
+from amuse.datamodel import Particles
+
+
+def binding_energy(i, j):
+    r = (i.position - j.position).length()
+    v = (i.velocity - j.velocity).length()
+    mu = (i.mass * j.mass) / (i.mass + j.mass)
+    return 0.5 * mu * v**2 - constants.G * i.mass * j.mass / r
+
+
+def compute_bound_components(particles):
+    """Return connected gravitationally bound components."""
+    N = len(particles)
+    adjacency = {p.key: set() for p in particles}
+
+    # Build adjacency list of bound pairs
+    for a in range(N):
+        for b in range(a + 1, N):
+            p = particles[a]
+            q = particles[b]
+            if binding_energy(p, q) < (0 | units.J):
+                adjacency[p.key].add(q.key)
+                adjacency[q.key].add(p.key)
+
+    # DFS to extract connected components
+    visited = set()
+    components = []
+    for p in particles:
+        if p.key in visited:
+            continue
+        stack = [p.key]
+        comp = []
+        while stack:
+            k = stack.pop()
+            if k not in visited:
+                visited.add(k)
+                comp.append(k)
+                stack.extend(adjacency[k] - visited)
+        components.append(comp)
+
+    return components
+
+
+def count_collisions(particle):
     """
-    Classify the end result of the simulation based on the number of surviving stars
-    and the presence (or absence) of a massive merger remnant.
+    Recursively count how many merger events formed this particle.
+    AMUSE merger products have attributes child1, child2.
+    """
+    n = 0
+    stack = [particle]
+    while stack:
+        p = stack.pop()
+        if hasattr(p, "child1") and p.child1 is not None:
+            n += 1
+            stack.append(p.child1)
+        if hasattr(p, "child2") and p.child2 is not None:
+            n += 1
+            stack.append(p.child2)
+    return n
 
-    Outcome classes:
-    - 'no_collision' : No stars merged or destroyed.
-    - 'destructive'  : One or more collisions occurred, no massive remnant.
-    - 'creative_ionized' : One or more collisions occurred; remnant is unbound.
-    - 'creative_bound'   : One or more collisions occurred; remnant is in a bound system.
 
-    Returns
-    -------
-    tuple
-        (outcome_label:str, descriptive_text:str)
+def outcomes(
+    initial_particles,
+    final_particles,
+    massive_threshold=70 | units.MSun,
+    creative_threshold=10 | units.MSun,
+):
+    """
+    Final outcome classifier (pickle-safe).
+    Returns: (label: str, info: dict)
     """
 
-    # --- Helper function ---
-    def is_bound_system(particles):  # <<- ATTENTION
-        """Return True if any pair of particles is gravitationally bound."""
-        if len(particles) < 2:
-            return False
-        for i, p_i in enumerate(particles[:-1]):
-            for j, p_j in enumerate(particles[i + 1 :], i + 1):
-                r_vec = p_i.position - p_j.position
-                v_vec = p_i.velocity - p_j.velocity
-                r = r_vec.length()
-                v = v_vec.length()
-                e_spec = 0.5 * v**2 - constants.G * (p_i.mass + p_j.mass) / r
-                if e_spec < 0 | (units.m**2 / units.s**2):
-                    return True
-        return False
+    # Ensure Particles format
+    if isinstance(final_particles, list):
+        final_particles = Particles(final_particles)
 
     n_init = len(initial_particles)
     n_final = len(final_particles)
 
-    # --- 1. No collision ---
-    if n_init == n_final and max_mass is not None:
-        label = "no_collision"
-        text = "No collision — all stars survived with their original masses."
-        return label, text
+    # -------------------------------------------------------------
+    # NO COLLISION
+    # -------------------------------------------------------------
+    if n_final == n_init:
+        return "no_collision", {
+            "description": "All stars survived.",
+            "n_final": n_final,
+        }
 
-    # --- 2. Destructive collision ---
-    if max_mass is None:
-        label = "destructive"
-        text = "Destructive collision — one or more stars destroyed, no remnant formed."
-        return label, text
+    # -------------------------------------------------------------
+    # ONE COLLISION
+    # -------------------------------------------------------------
+    if n_final == n_init - 1:
 
-    # --- 3. Creative collision ---
-    if n_final < n_init:
-        bound = is_bound_system(final_particles)
-        if bound:
-            label = "creative_bound"
-            if max_mass < 80 | units.MSun:
-                text = "Creative collision — remnant < 80 M☉ in bound system."
-            else:
-                text = (
-                    f"Creative collision — bound system formed with remnant "
-                    f"of {max_mass.value_in(units.MSun):.1f} M☉."
-                )
+        final_max_mass = max(p.mass for p in final_particles)
+        mm = max(final_particles, key=lambda p: p.mass)
+
+        if final_max_mass < creative_threshold:
+            return "destructive", {
+                "remnant_mass_Msun": final_max_mass.value_in(units.MSun)
+            }
+
+        if final_max_mass < massive_threshold:
+            return "creative_not_massive", {
+                "remnant_mass_Msun": final_max_mass.value_in(units.MSun)
+            }
+
+        # Massive remnant
+        if len(final_particles) == 1:
+            return "creative_ionized", {
+                "remnant_mass_Msun": final_max_mass.value_in(units.MSun),
+            }
+
+        comps = compute_bound_components(final_particles)
+        comp = next(c for c in comps if mm.key in c)
+
+        if len(comp) > 1:
+            return "creative_bound", {
+                "remnant_mass_Msun": final_max_mass.value_in(units.MSun),
+                "n_companions": len(comp) - 1,
+            }
         else:
-            label = "creative_ionized"
-            text = (
-                f"Creative collision — ionized outcome, isolated remnant "
-                f"of {max_mass.value_in(units.MSun):.1f} M☉."
-            )
-        return label, text
+            return "creative_ionized", {
+                "remnant_mass_Msun": final_max_mass.value_in(units.MSun),
+            }
 
-    # --- Fallback ---
-    label = "unclassified"
-    text = "Unclassified outcome — ambiguous particle count or data inconsistency."
-    return label, text
+        # -------------------------------------------------------------
+    # MULTIPLE COLLISIONS
+    # -------------------------------------------------------------
+    components = compute_bound_components(final_particles)
+    massive_stars = final_particles.select(lambda m: m >= massive_threshold, ["mass"])
+
+    if len(massive_stars) == 0:
+        return "creative_not_massive", {
+            "description": "Multiple mergers, no massive remnants.",
+            "n_massive": 0,
+        }
+
+    summary = []
+
+    for m in massive_stars:
+        # count how many mergers built this object
+        n_coll = count_collisions(m)
+
+        # group membership
+        comp = next(c for c in components if m.key in c)
+        comp_size = len(comp)
+
+        if comp_size == 1:
+            rem_type = "creative_ionized"
+        else:
+            rem_type = "creative_bound"
+
+        summary.append(
+            {
+                "type": rem_type,
+                "mass_Msun": m.mass.value_in(units.MSun),
+                "n_collisions": n_coll,
+                "component_size": comp_size,
+            }
+        )
+
+    return "multiple_collisions", summary
+
+
+def transformation_to_cartesian(
+    sep,
+    true_anomalies,
+    ecc,
+    theta,
+    phi,
+    v_mag,
+    distance,
+):
+    """
+    Compute initial conditions for a 6-body triple binary system with
+    incoming binaries B and C approaching roughly from opposite directions,
+    using independent theta and phi for each binary.
+
+    Parameters:
+        theta : list of 2 floats, polar angles for B and C
+        phi   : list of 2 floats, azimuthal angles for B and C
+        v_mag : list of 2 floats, velocities in units of fraction of critical
+
+    Returns:
+        centers, v_vectors, directions, orbit_plane, phases
+    """
+    if len(theta) != 2 or len(phi) != 2 or len(v_mag) != 2 or len(distance) != 2:
+        raise ValueError(
+            "theta, phi, v_mag, distance must all have length 2 (for B and C)"
+        )
+
+    # --------------------------
+    # Compute critical velocity
+    # --------------------------
+    v_crit = critical_velocity([50.0] * 6, sep, ecc)
+    if hasattr(v_crit, "value_in"):  # AMUSE Quantity
+        v_crit_val = float(v_crit.value_in(units.kms))
+    else:
+        v_crit_val = float(v_crit)
+
+    # --------------------------
+    # Binary A: fixed at origin
+    # --------------------------
+    centers = [[0.0, 0.0, 0.0]]
+    v_vectors = [[0.0, 0.0, 0.0]]
+    directions = [0.0]
+    orbit_plane = [[0.0, 0.0, 1.0]]  # xy-plane
+    phases = [true_anomalies[0]]
+
+    # --------------------------
+    # Binaries B and C
+    # --------------------------
+    for i in range(2):
+        r = np.array(
+            [
+                distance[i] * np.sin(phi[i]) * np.cos(theta[i]),
+                distance[i] * np.sin(phi[i]) * np.sin(theta[i]),
+                distance[i] * np.cos(phi[i]),
+            ]
+        )
+        # velocity points roughly toward origin
+        v_dir = -r / np.linalg.norm(r)
+        v_vec = v_mag[i] * v_crit_val * v_dir
+        centers.append(r.tolist())
+        v_vectors.append(v_vec.tolist())
+
+        # Orbit plane
+        n = np.cross(v_vec, r)
+        n_norm = np.linalg.norm(n)
+        n_unit = n / n_norm if n_norm > 1e-12 else np.array([0.0, 0.0, 1.0])
+        orbit_plane.append(n_unit.tolist())
+
+        # Direction in plane
+        ref = np.array([1.0, 0.0, 0.0])
+        v_proj = v_vec - np.dot(v_vec, n_unit) * n_unit
+        if np.linalg.norm(v_proj) < 1e-12:
+            angle = 0.0
+        else:
+            v_proj /= np.linalg.norm(v_proj)
+            angle = np.arctan2(
+                np.dot(np.cross(ref, v_proj), n_unit), np.dot(ref, v_proj)
+            )
+        directions.append(float(angle))
+
+        # Phase
+        phases.append(true_anomalies[i + 1])
+
+    return centers, v_vectors, directions, orbit_plane, phases

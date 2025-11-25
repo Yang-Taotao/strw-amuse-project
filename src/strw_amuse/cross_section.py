@@ -1,104 +1,251 @@
+# Imports
+from multiprocessing import Pool, cpu_count
+from collections import Counter
+from tqdm import tqdm
+import corner
+import matplotlib.pyplot as plt
 import numpy as np
+
 from amuse.units import units
-from run_6body_encounter import run_6_body_simulation
-from helpers import outcomes as classify_outcome
-import warnings
+from src.strw_amuse.run_simulation import run_6_body_simulation
 
-warnings.filterwarnings("ignore", category=RuntimeWarning)
 
-def sample_initial_conditions(N_binaries=3):
-    """Sample initial conditions for N_binaries colliding binaries."""
-    f = np.random.uniform(0, 2*np.pi, N_binaries)
-    sep = [float(1.0 / (2.0 * np.cos(fi/2.0)**2)) for fi in f]
-    ecc = [float(e) for e in np.random.uniform(0.0, 0.9, N_binaries)]
-    phi = np.random.uniform(0, 2*np.pi, N_binaries)
-    theta = np.random.uniform(0, np.pi/2, N_binaries)
-    psi = np.random.uniform(0, 2*np.pi, N_binaries)
+# -------------------------
+# Sampling initial conditions
+# -------------------------
+def sample_19D_lhs(n_samples, rng=None):
+    """
+    Generate stratified Latin Hypercube samples in the fixed 19D parameter space
+    for 3 binaries + 2 incoming binaries encounters.
+    Returns: list of sample dictionaries, each with keys:
+        ecc, sep, v_mag, impact_parameter, theta, phi, psi, true_anomalies, distance, weight
+    """
 
-    directions = []
-    for i in range(N_binaries):
-        vec = np.array([np.cos(phi[i])*np.sin(theta[i]), 0, np.sin(phi[i])*np.sin(theta[i])])
-        norm = np.linalg.norm(vec)
-        if norm > 0:
-            vec /= norm
-        else:
-            vec = np.array([1.0,0.0,0.0])
-        directions.append(float(vec[0]))  # keep scalar if run_6_body_simulation expects scalar
+    if rng is None:
+        rng = np.random.default_rng()
 
-    centers = []
-    for i in range(N_binaries):
-        c = np.array([20.0*np.cos(psi[i]), 20.0*np.sin(psi[i]), 0.0])
-        centers.append(c.tolist())
+    samples = []
 
-    b = [float(bi) for bi in np.random.uniform(0.0, 20.0, N_binaries)]
-    v_coms = [[float(np.random.uniform(0,50.0)), 0.0, 0.0] for _ in range(N_binaries)]
+    # --- Define the parameter ranges ---
+    param_ranges = {
+        "ecc": [(0.0, 0.99)] * 3,  # 3 binaries
+        "sep": [(2.0, 50.0)] * 3,  # AU
+        "v_mag": [(0.1, 1.0)] * 2,  # incoming binaries
+        "impact_parameter": [(0.0, 5.0)] * 2,  # AU
+        "theta": [(0.0, np.pi / 2)] * 2,
+        "phi": [(0.0, 2 * np.pi)] * 2,
+        "psi": [(0.0, 2 * np.pi)] * 2,
+        "true_anomalies": [(0.0, 2 * np.pi)] * 3,
+    }
 
-    return sep, ecc, directions, centers, b, v_coms
+    # Flatten param ranges
+    param_names, param_bounds = [], []
+    for k, bounds in param_ranges.items():
+        for i, b in enumerate(bounds):
+            param_names.append(f"{k}_{i}")
+            param_bounds.append(b)
 
-def sequential_top_creative_collision(N_trials=100, N_best=5, N_binaries=3, distance=100.0):
-    """Run N_trials and keep top N_best creative_collision cases."""
-    
-    if isinstance(distance, (float,int)):
-        distance = [distance, distance]
-    
-    top_trials = []  # stores dicts with parameters + outcome info
+    n_params = len(param_names)  # should be 19
 
-    print_every = max(1, N_trials // 10)
+    # --- Latin Hypercube: stratify each dimension ---
+    lhs = rng.uniform(size=(n_samples, n_params))
+    for j in range(n_params):
+        lhs[:, j] = (lhs[:, j] + np.arange(n_samples)) / n_samples
 
-    for idx in range(N_trials):
-        
-        print(f"Simulation {idx+1}/{N_trials}... ", end='')
+    # --- Scale to parameter ranges and assemble sample dicts ---
+    for i in range(n_samples):
+        sample_dict = {k: [] for k in param_ranges.keys()}  # grouped by type
+        for j, pname in enumerate(param_names):
+            low, high = param_bounds[j]
+            val = low + lhs[i, j] * (high - low)
+            base_name = "_".join(pname.split("_")[:-1])  # <--- FIXED
+            sample_dict[base_name].append(val)
+        # fixed outer distances
+        sample_dict["distance"] = [50.0, 50.0]
+        sample_dict["weight"] = 1.0
+        samples.append(sample_dict)
 
-        sep, ecc, directions, centers, b, v_coms = sample_initial_conditions(N_binaries=N_binaries)
-        
-        try:
-            frames, max_mass, max_velocity, outcome = run_6_body_simulation(
-                sep, ecc, directions, v_coms,
-                centers, b, distance=distance,
-                masses=None, centers=None, age=None,
-                run_label=f"Trial_{idx+1}"
-            )
-        except Exception as e:
-            print(f"Simulation {idx+1} failed: {e}")
-            continue
+    return samples
 
-        # Determine outcome label and description
-        if isinstance(outcome, str):
-            label = outcome
-            description = f"Pre-classified: {outcome}"
-        else:
-            try:
-                label, description = classify_outcome(
-                    initial_particles=frames[0],
-                    final_particles=frames[-1],
-                    max_mass=max_mass
-                )
-            except Exception as e:
-                label = 'unclassified'
-                description = f"Error: {e}"
 
-        # If creative collision, record trial
-        if label in ['creative_ionized']:
-            trial_info = {
-                'sep': sep,
-                'ecc': ecc,
-                'directions': directions,
-                'centers': centers,
-                'b': b,
-                'v_coms': v_coms,
-                'max_mass': max_mass,
-                'max_velocity': max_velocity,
-                'label': label,
-                'description': description
-            }
-            top_trials.append(trial_info)
-            # Sort by most massive star's velocity for creative_ionized, largest first
-            top_trials = sorted(top_trials, key=lambda x: x['max_velocity'].value_in(units.km/units.s), reverse=True)
-            top_trials = top_trials[:N_best]  # keep only top N_best
+# -------------------------
+# Helper fixing run simulation outcomes: use that or fix outcome format in the main simulation function
+# -------------------------
+def sanitize_outcome(outcome):
+    """
+    Convert any outcome from run_6_body_simulation into a pickle-safe label.
+    Detect creative_ionized remnants even inside multi-collision outcomes.
+    """
+    # outcome = (label, info)
+    if isinstance(outcome, tuple) and len(outcome) == 2:
+        label, info = outcome
 
-        if (idx % print_every) == 0:
-            v_kms = max_velocity.value_in(units.km/units.s)
-            print(f"Most massive star velocity: {v_kms:.2f} km/s, outcome: {label}")
+        # Single collision categories are already strings
+        if label != "multiple_collisions":
+            return str(label), None
 
-    print(f"\nCollected top {len(top_trials)} creative collision trials.")
-    return top_trials
+        # MULTIPLE COLLISIONS: inspect info list
+        if isinstance(info, list):
+            # check if any remnant is creative_ionized
+            for rem in info:
+                if rem.get("type") == "creative_ionized":
+                    return "creative_ionized", None
+            # otherwise check if any are bound massive
+            for rem in info:
+                if rem.get("type") == "creative_bound":
+                    return "creative_bound", None
+
+            # fallback
+            return "multiple_collisions", None
+
+    if isinstance(outcome, list):
+        return "multiple_collisions", None
+
+    return "unknown", None
+
+
+# -------------------------
+# Single Simulation
+# -------------------------
+def _run_single_simulation(sample):
+    w = sample["weight"]
+    try:
+        frames, outcome = run_6_body_simulation(
+            sample["sep"],
+            sample["true_anomalies"],
+            sample["ecc"],
+            sample["theta"],
+            sample["phi"],
+            sample["v_mag"],
+            sample["impact_parameter"],
+            sample["psi"],
+            sample["distance"],
+            run_label="MC",
+        )
+
+        safe_label, _ = sanitize_outcome(outcome)
+        return safe_label, w
+
+    except Exception as e:
+        return "simulation_failed", w
+
+
+# -------------------------
+# Monte Carlo Simulations
+# -------------------------
+def monte_carlo_19D(n_samples, n_cores=None, verbose=True):
+    """
+    Run n_samples 6-body simulations using Latin Hypercube sampling in 19D parameter space.
+    Executes in parallel using n_cores.
+    Returns weighted counts and probabilities of outcomes.
+    """
+    if n_cores is None:
+        n_cores = cpu_count()
+
+    samples = sample_19D_lhs(n_samples)
+
+    # --- Run simulations in parallel ---
+    results = []
+    with Pool(processes=n_cores) as pool:
+        for outcome_label, weight in tqdm(
+            pool.imap_unordered(_run_single_simulation, samples),
+            total=n_samples,
+            disable=not verbose,
+        ):
+            results.append((outcome_label, weight))
+
+    # --- Weighted counts ---
+    weighted_counts = Counter()
+    for label, w in results:
+        weighted_counts[label] += w
+
+    total_weight = sum(weighted_counts.values()) - weighted_counts.get(
+        "simulation_failed", 0
+    )
+
+    # --- Probabilities ---
+    probabilities = {
+        k: v / total_weight
+        for k, v in weighted_counts.items()
+        if k != "simulation_failed"
+    }
+
+    return dict(
+        n_samples=n_samples,
+        samples=samples,
+        results=results,  # <--- add this
+        weighted_counts=weighted_counts,
+        probabilities=probabilities,
+    )
+
+
+# -------------------------
+# Corner Plot
+# -------------------------
+
+
+def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
+    """
+    Generate a corner plot for all samples that produced the given outcome_name.
+
+    Parameters
+    ----------
+    samples : list of dicts
+        Output of sample_19D_lhs()
+    results : list of (label, weight)
+        Output collected from the parallel pool
+    outcome_name : str
+        Outcome category to filter (e.g., "creative_ionized")
+    """
+
+    # ---- 1. Collect matching sample indices ----
+    indices = [i for i, (label, _) in enumerate(results) if label == outcome_name]
+
+    if len(indices) == 0:
+        print(f"No samples with outcome '{outcome_name}'. Cannot make corner plot.")
+        return
+
+    # ---- 2. Build matrix of parameters ----
+    data = []
+    labels = []
+
+    # build list of parameter names in stable order
+    param_order = [
+        "ecc",
+        "sep",
+        "v_mag",
+        "impact_parameter",
+        "theta",
+        "phi",
+        "psi",
+        "true_anomalies",
+    ]
+    # count lengths = 3, 3, 2, 2, 2, 2, 2, 3
+
+    # Construct readable axis labels
+    axis_labels = []
+    for k in param_order:
+        for i in range(len(samples[0][k])):
+            axis_labels.append(f"{k}_{i}")
+
+    # Fill matrix
+    for idx in indices:
+        s = samples[idx]
+        row = []
+        for k in param_order:
+            row.extend(list(s[k]))
+        data.append(row)
+
+    data = np.array(data)
+
+    # ---- 3. Plot ----
+    fig = corner.corner(
+        data,
+        labels=axis_labels,
+        show_titles=True,
+        title_fmt=".2f",
+        quantiles=[0.16, 0.5, 0.84],
+        bins=25,
+    )
+
+    plt.show()
