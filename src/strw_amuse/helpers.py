@@ -14,6 +14,132 @@ from amuse.datamodel import Particles, Particle
 
 
 # func repo
+def make_trinary_system(
+    masses,
+    positions,
+    velocities,
+    seperations,
+    ecc,
+    phase
+):
+        "Function takes list of masses, must be size 3, also takes a 3x3 array of positions and velocities"
+        "Stars are initialized to the position of the star at position 0, so take this into account"
+
+        
+        binary=generate_binaries(masses[0]|units.MSun,
+                                 masses[1]|units.MSun,
+                                 seperations[0]|units.AU,
+                                 ecc[0],
+                                 phase[0]|units.deg)
+        # Now generate a trinary from the binary and the remaining mass
+        trinary=generate_binaries(binary[0].mass+binary[1].mass,
+                                  masses[2]|units.MSun,
+                                  seperations[1]|units.AU,
+                                 ecc[1],
+                                 phase[1]|units.deg)
+        # Final system will consist out of binary+trinary[1]
+        binary[0].position=positions|units.au
+        binary[1].position+=binary[0].position
+        binary[0].velocities=velocities[0]|units.kms
+        binary[1].velocities=velocities[1]|units.kms
+        trinary[1].velocities=velocities[2]|units.kms
+        binary[1].velocities+=binary[0].velocities
+        trinary[1].position+=binary[0].position
+        trinary[1].velocities+=binary[0].velocities
+        system=[binary[0],binary[1],trinary[1]]
+
+        return system
+def make_binary_system(masses,
+    positions,
+    velocities,
+    seperations,
+    ecc,
+    phase):
+    binary=generate_binaries(masses[0]|units.MSun,
+                                 masses[1]|units.MSun,
+                                 seperations[0]|units.AU,
+                                 ecc[0],
+                                 phase[0]|units.deg)
+    binary[0].position=positions|units.au
+    binary[1].position+=binary[0].position
+    binary[0].velocities=velocities[0]|units.kms
+    binary[1].velocities=velocities[1]|units.kms
+    binary[1].velocities+=binary[0].velocities
+    return binary
+
+def new_N_systems(params_bin_arr,params_trip_arr,iter):
+    binaries=[]
+    triplets=[]
+    if len(params_bin_arr)==0:
+        for i in range(n_trip):
+            trips=make_trinary_system(params_trip_arr[iter][1][i],params_trip_arr[iter][3][i],params_trip_arr[iter][2][i],params_trip_arr[iter][4][i],params_trip_arr[iter][5][i],params_trip_arr[iter][6][i])
+            triplets.append(trips)
+        return binaries,triplets
+    elif len(params_trip_arr)==0:
+        for i in range(n_bin):
+            bins=make_binary_system(params_bin_arr[iter][1][i],params_bin_arr[iter][3][i],params_bin_arr[iter][2][i],params_bin_arr[iter][4][i],params_bin_arr[iter][5][i],params_bin_arr[iter][6][i])
+            binaries.append(bins)
+        return binaries,triplets
+    elif (len(params_bin_arr)!=0)&(len(params_trip_arr)!=0):
+        for i in range(n_bin):
+            bins=make_binary_system(params_bin_arr[iter][1][i],params_bin_arr[iter][3][i],params_bin_arr[iter][2][i],params_bin_arr[iter][4][i],params_bin_arr[iter][5][i],params_bin_arr[iter][6][i])
+            binaries.append(bins)
+        for i in range(n_trip):
+            trips=make_trinary_system(params_trip_arr[iter][1][i],params_trip_arr[iter][3][i],params_trip_arr[iter][2][i],params_trip_arr[iter][4][i],params_trip_arr[iter][5][i],params_trip_arr[iter][6][i])
+            triplets.append(trips)
+        return binaries,triplets
+def initiator(runs,array):
+    params_bin_arr,params_trip_arr=vector_params(runs,array)
+    for i in range(runs):
+        binaries,triplets=new_N_systems(params_bin_arr,params_trip_arr,i)
+        #result=run_simulation(binaries,triplets)
+        #analyze(result)
+    pass
+def vector_params(runs,n_bin, n_trip, m_min,m_max, vel_min,vel_max, position_min,position_max, sep_min,sep_max,ecc_min,ecc_max,phase_min,phase_max,theta_min,theta_max,phi_min,phi_max,imp_min,imp_max,psi_min,psi_max):
+    masses=np.random.uniform(m_min,m_max,size=(runs,6))
+
+    eccs=np.random.uniform(ecc_min,ecc_max,size=(runs,3))
+    velocities=np.random.uniform(vel_min,vel_max,size=(runs,2))
+    position=np.random.uniform(position_min,position_max,size=(runs,2))
+    separations=np.random.uniform(sep_min,sep_max,size=(runs,3))
+
+    anomalies=np.random.uniform(phase_min,phase_max,size=(runs,3))
+    thetas=np.random.uniform(theta_min,theta_max,size=(runs,2))
+    
+    phis=np.random.uniform(phi_min,phi_max,size=(runs,2))
+    impact=np.random.uniform(imp_min,imp_max,size=(runs,2))
+    psis=np.random.uniform(psi_min,psi_max,size=(runs,2))
+
+   # params_bin_arr=np.empty(runs,dtype='object')
+    #params_trip_arr=np.empty(runs,dtype='object')  
+    #mass_select=np.random.choice(masses,size=2*n_bin,replace=False)  
+    #vel_select=np.random.choice(velocities,size=((n_bin-1),3),replace=False)
+    #position_select=np.random.choice(position,size=((n_bin-1),3),replace=False)
+    #separation_select=np.random.choice(separations,size=n_bin,replace=False)
+    #eccs_select=np.random.choice(eccs,size=n_bin,replace=False)
+    #phases_select=np.random.choice(phases,size=n_bin,replace=False)
+
+        #mass_trip_select=np.random.choice(masses,size=3*n_trip,replace=False)
+        #mass_trip_select=np.reshape(mass_trip_select,(n_trip,3))
+        
+        #vel_trip_select=np.random.choice(velocity_trip,size=9*n_trip,replace=False)
+        #vel_trip_select=np.reshape(vel_trip_select,(3*n_trip,3))
+        
+        #position_trip_select=np.random.choice(position_trip,size=3*n_trip,replace=False)
+        #position_trip_select=np.reshape(position_trip_select,(n_trip,3))
+        
+        #separation_trip_select=np.random.choice(separation,size=6*n_trip,replace=True)
+        #separation_trip_select=np.reshape(separation_trip_select,(2*n_trip,3))
+        
+        #eccs_trip_select=np.random.choice(eccs,size=2*n_trip,replace=True)
+        #eccs_trip_select=np.reshape(eccs_trip_select,(n_trip,2))
+        
+        #phases_trip_select=np.random.choice(phases,size=2*n_trip,replace=False)
+        #phases_trip_select=np.reshape(phases_trip_select,(n_trip,2))
+        #params_bin_arr[i]=(n_bin,mass_bin_select,vel_bin_select,position_bin_select,separation_bin_select,eccs_bin_select,phases_bin_select)
+        #params_trip_arr[i]=(n_trip,mass_trip_select,vel_trip_select,position_trip_select,separation_trip_select,eccs_trip_select,phases_trip_select)
+
+    return separations,eccs,velocities,phis,anomalies,thetas,impact,masses,position,psis
 
 
 def pairwise_separations(particles):
@@ -230,7 +356,7 @@ def make_triple_binary_system(
         phases = [0.0, 0.0, 0.0]
     if psi is None:
         psi = [0.0, 0.0, 0.0]
-
+   
     ma1, ma2, mb1, mb2, mc1, mc2 = masses
     sep_a, sep_b, sep_c = seps
     dir_a, dir_b, dir_c = directions
@@ -392,6 +518,7 @@ def make_binary(
         r_plane = np.eye(3) + vx + np.matmul(vx, vx) * ((1 - c) / s**2)
 
     c2, s2 = np.cos(direction), np.sin(direction)
+
     r_dir = np.array([[c2, -s2, 0], [s2, c2, 0], [0, 0, 1]])
     r_total = np.dot(r_plane, r_dir)
 

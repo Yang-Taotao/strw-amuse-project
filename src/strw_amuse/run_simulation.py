@@ -14,7 +14,7 @@ from amuse.community.ph4.interface import ph4
 from amuse.io import write_set_to_file  # , read_set_from_file
 from amuse.datamodel import Particle, Particles
 
-from src.strw_amuse.helpers import (
+from helpers import (
     make_seba_stars,
     make_triple_binary_system,
     make_sph_from_two_stars,
@@ -26,7 +26,7 @@ from src.strw_amuse.helpers import (
     # compute_remnant_spin,
 )
 
-from src.strw_amuse.config import (
+from config import (
     OUTPUT_DIR_COLLISIONS,
     OUTPUT_DIR_FINAL_STATES,
     OUTPUT_DIR_LOGS,
