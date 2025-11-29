@@ -19,6 +19,27 @@ from itertools import combinations
 import helpers
 import run_simulation
 np.random.seed(1)
+system=helpers.make_trinary_system(
+    50,
+    20,
+    10,
+    5|units.AU,
+    30|units.AU,
+    e1=0.0,
+    e2=0.0,
+    center=20,
+    direction=0.0,
+    orbit_plane=[0, 0, 1],
+    impact_parameter=1.0 | units.AU,
+    f=0.0,  # true anomaly
+    psi=0.0,  # impact orientation
+)
+
+for star in system:
+    print(star)
+
+
+
 m_min=10
 m_max=50
 vel_min=0
@@ -46,9 +67,7 @@ n_trip=0
 runs=2
 psi_min=0
 psi_max=180
-separations,eccs,velocities,phis,anomalies,thetas,impact,masses,position,psis=helpers.vector_params(runs,
-                                                                                           n_bin,
-                                                                                             n_trip,
+separations,eccs,velocities,phis,anomalies,thetas,impact,masses,position,psis=helpers.vector_params_trip(runs,                                                                                         
                                                                                                m_min,
                                                                                                m_max,
                                                                                                  vel_min,

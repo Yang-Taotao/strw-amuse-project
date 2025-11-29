@@ -14,41 +14,7 @@ from amuse.datamodel import Particles, Particle
 
 
 # func repo
-def make_trinary_system(
-    masses,
-    positions,
-    velocities,
-    seperations,
-    ecc,
-    phase
-):
-        "Function takes list of masses, must be size 3, also takes a 3x3 array of positions and velocities"
-        "Stars are initialized to the position of the star at position 0, so take this into account"
 
-        
-        binary=generate_binaries(masses[0]|units.MSun,
-                                 masses[1]|units.MSun,
-                                 seperations[0]|units.AU,
-                                 ecc[0],
-                                 phase[0]|units.deg)
-        # Now generate a trinary from the binary and the remaining mass
-        trinary=generate_binaries(binary[0].mass+binary[1].mass,
-                                  masses[2]|units.MSun,
-                                  seperations[1]|units.AU,
-                                 ecc[1],
-                                 phase[1]|units.deg)
-        # Final system will consist out of binary+trinary[1]
-        binary[0].position=positions|units.au
-        binary[1].position+=binary[0].position
-        binary[0].velocities=velocities[0]|units.kms
-        binary[1].velocities=velocities[1]|units.kms
-        trinary[1].velocities=velocities[2]|units.kms
-        binary[1].velocities+=binary[0].velocities
-        trinary[1].position+=binary[0].position
-        trinary[1].velocities+=binary[0].velocities
-        system=[binary[0],binary[1],trinary[1]]
-
-        return system
 def make_binary_system(masses,
     positions,
     velocities,
@@ -95,7 +61,7 @@ def initiator(runs,array):
         #result=run_simulation(binaries,triplets)
         #analyze(result)
     pass
-def vector_params(runs,n_bin, n_trip, m_min,m_max, vel_min,vel_max, position_min,position_max, sep_min,sep_max,ecc_min,ecc_max,phase_min,phase_max,theta_min,theta_max,phi_min,phi_max,imp_min,imp_max,psi_min,psi_max):
+def vector_params_bin(runs,n_bin, n_trip, m_min,m_max, vel_min,vel_max, position_min,position_max, sep_min,sep_max,ecc_min,ecc_max,phase_min,phase_max,theta_min,theta_max,phi_min,phi_max,imp_min,imp_max,psi_min,psi_max):
     masses=np.random.uniform(m_min,m_max,size=(runs,6))
 
     eccs=np.random.uniform(ecc_min,ecc_max,size=(runs,3))
@@ -140,8 +106,23 @@ def vector_params(runs,n_bin, n_trip, m_min,m_max, vel_min,vel_max, position_min
         #params_trip_arr[i]=(n_trip,mass_trip_select,vel_trip_select,position_trip_select,separation_trip_select,eccs_trip_select,phases_trip_select)
 
     return separations,eccs,velocities,phis,anomalies,thetas,impact,masses,position,psis
+def vector_params_trip(runs, m_min,m_max, vel_min,vel_max, position_min,position_max, sep_min,sep_max,ecc_min,ecc_max,phase_min,phase_max,theta_min,theta_max,phi_min,phi_max,imp_min,imp_max,psi_min,psi_max):
+    # Assumed that there are 2 trinaries, one is located at the center
+    
+    masses=np.random.uniform(m_min,m_max,size=(runs,6))
 
+    eccs=np.random.uniform(ecc_min,ecc_max,size=(runs,2,2))
+    velocities=np.random.uniform(vel_min,vel_max,size=(runs,1))
+    position=np.random.uniform(position_min,position_max,size=(runs,1))
+    separations=np.random.uniform(sep_min,sep_max,size=(runs,2,2))
 
+    anomalies=np.random.uniform(phase_min,phase_max,size=(runs,2,2))
+    thetas=np.random.uniform(theta_min,theta_max,size=(runs,1))
+    
+    phis=np.random.uniform(phi_min,phi_max,size=(runs,1))
+    impact=np.random.uniform(imp_min,imp_max,size=(runs,1))
+    psis=np.random.uniform(psi_min,psi_max,size=(runs,1))
+    return separations,eccs,velocities,phis,anomalies,thetas,impact,masses,position,psis
 def pairwise_separations(particles):
     """Return list of (i,j, separation_length) for particle set."""
     pairs = []
@@ -535,7 +516,138 @@ def make_binary(
     p2.velocity = vel2
 
     return p1, p2
+def make_trinary_system(
+    m1,
+    m2,
+    m3,
+    a1,
+    a2,
+    e1=0.0,
+    e2=0.0,
+    center=None,
+    direction=0.0,
+    orbit_plane=[0, 0, 1],
+    impact_parameter=0.0 | units.AU,
+    f=0.0,  # true anomaly
+    psi=0.0,  # impact orientation
+):
+        "Function takes list of masses, must be size 3, also takes a 3x3 array of positions and velocities"
+        "Stars are initialized to the position of the star at position 0, so take this into account"
 
+        plane = np.array(orbit_plane, dtype=float)
+        plane /= np.linalg.norm(plane)
+
+    # Reference vector perpendicular to orbit plane
+        ref = (
+        np.array([1, 0, 0])
+        if abs(np.dot(plane, [1, 0, 0])) < 0.9
+        else np.array([0, 1, 0])
+    )
+        off_set_dir = np.cross(plane, ref)
+        off_set_dir /= np.linalg.norm(off_set_dir)
+        c2, s2 = np.cos(direction + psi), np.sin(direction + psi)
+        r_dir = np.array([[c2, -s2, 0], [s2, c2, 0], [0, 0, 1]])
+        off_set_dir = np.dot(r_dir, off_set_dir)
+
+    # Masses
+        m1 = m1 | units.MSun
+        m2 = m2 | units.MSun
+        m3=m3 | units.MSun
+        total_mass = m1+m2+m3
+        # Center including impact parameter along offset
+        if not isinstance(center, VectorQuantity):
+            center = VectorQuantity(center, units.AU)
+        center += off_set_dir * impact_parameter
+
+    # Positions using true anomaly f
+        r_rel_1 = a1 * (1 - e1**2) / (1 + e1 * np.cos(f))
+        r1_2 = -(m2 / total_mass) * r_rel_1
+        r2_1 = (m1 / total_mass) * r_rel_1
+
+        r_rel_2 = a2 * (1 - e2**2) / (1 + e2 * np.cos(f))
+        r3 = ((m1+m2) / total_mass) * r_rel_2
+        #r1_2 = -(m3 / total_mass) * r_rel_2
+        M12=m1+m2
+        # Orbital velocities
+        if e1 == 0.0:
+            v_rel_1 = (constants.G * M12 / a1) ** 0.5
+        elif e1 < 1.0:
+            v_rel_1 = (constants.G * M12 * (1 + e1) / (a1 * (1 - e1))) ** 0.5
+        else:
+            raise ValueError("Eccentricity (1) must be < 1")
+        if e2 == 0.0:
+            v_rel_2 = (constants.G * total_mass / a2) ** 0.5
+        elif e2 < 1.0:
+            v_rel_2 = (constants.G * total_mass * (1 + e2) / (a2 * (1 - e2))) ** 0.5
+        else:
+            raise ValueError("Eccentricity (2) must be < 1")
+
+        v1_1 = +(m2 / M12) * v_rel_1
+        v2_1 = -(m1 / M12) * v_rel_1
+        v3=-(m3/total_mass)*v_rel_1
+        v_cm=+(m3/total_mass)*v_rel_2
+        v3=-(M12/total_mass)*v_rel_2
+        v1=v1_1+v_cm
+        v2=v2_1+v_cm
+
+        pos1_base = np.array(
+        [r1_2.value_in(units.AU) * np.cos(f), r1_2.value_in(units.AU) * np.sin(f), 0.0]
+    )
+        pos2_base = np.array(
+        [r2_1.value_in(units.AU) * np.cos(f), r2_1.value_in(units.AU) * np.sin(f), 0.0]
+    )
+        pos3_base = np.array(
+        [r3.value_in(units.AU) * np.cos(f), r3.value_in(units.AU) * np.sin(f), 0.0]
+    )
+        vel1_base = np.array(
+        [-v1.value_in(units.kms) * np.sin(f), v1.value_in(units.kms) * np.cos(f), 0.0]
+    )
+        vel2_base = np.array(
+        [-v2.value_in(units.kms) * np.sin(f), v2.value_in(units.kms) * np.cos(f), 0.0]
+    )
+        vel3_base = np.array(
+        [-v3.value_in(units.kms) * np.sin(f), v3.value_in(units.kms) * np.cos(f), 0.0]
+    )
+        n = plane
+        z_axis = np.array([0.0, 0.0, 1.0])
+        v_cross = np.cross(z_axis, n)
+        s = np.linalg.norm(v_cross)
+        c = np.dot(z_axis, n)
+        if s == 0:
+            r_plane = np.eye(3) if c > 0 else -np.eye(3)
+        else:
+            vx = np.array(
+                [
+                    [0, -v_cross[2], v_cross[1]],
+                    [v_cross[2], 0, -v_cross[0]],
+                    [-v_cross[1], v_cross[0], 0],
+                ]
+            )
+            r_plane = np.eye(3) + vx + np.matmul(vx, vx) * ((1 - c) / s**2)
+
+        c2, s2 = np.cos(direction), np.sin(direction)
+
+        r_dir = np.array([[c2, -s2, 0], [s2, c2, 0], [0, 0, 1]])
+        r_total = np.dot(r_plane, r_dir)
+
+        pos1 = np.dot(r_total, pos1_base) | units.AU
+        pos2 = np.dot(r_total, pos2_base) | units.AU
+        pos3 = np.dot(r_total, pos3_base) | units.AU
+        vel1 = np.dot(r_total, vel1_base) | units.kms
+        vel2 = np.dot(r_total, vel2_base) | units.kms
+        vel3 = np.dot(r_total, vel3_base) | units.kms
+
+        p1 = Particle(mass=m1)
+        p2 = Particle(mass=m2)
+        p3 = Particle(mass=m3)
+        p1.position = center + pos1
+        p2.position = center + pos2
+        p3.position = center + pos3
+        p1.velocity = vel1
+        p2.velocity = vel2
+        p3.velocity = vel3
+        return p1,p2,p3
+        # TODO: Finish the function
 
 def make_seba_stars(masses_msun, age):
     """
