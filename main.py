@@ -72,7 +72,7 @@ param_collision_ionized = (
     run_label,
 )
 # %%
-# Run sim - no encounter
+# Run sim - ionized
 frames_collision_ionized, outcome = run_6_body_simulation(*param_collision_ionized)
 
 # %%

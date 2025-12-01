@@ -1,5 +1,4 @@
-
-# Imports 
+# Imports
 from multiprocessing import Pool, cpu_count
 from collections import Counter
 from tqdm import tqdm
@@ -13,7 +12,7 @@ from src.strw_amuse.run_simulation import run_6_body_simulation
 
 # -------------------------
 # Sampling initial conditions
-# ------------------------- 
+# -------------------------
 def sample_19D_lhs(n_samples, rng=None):
     """
     Generate stratified Latin Hypercube samples in the fixed 19D parameter space
@@ -29,12 +28,25 @@ def sample_19D_lhs(n_samples, rng=None):
         rng = np.random.default_rng()
 
     # --- Define independent parameter counts ---
-    param_counts = np.array([3, 3, 2, 2, 2, 2, 2, 3])  # ecc, sep, v_mag, impact, theta, phi, psi, anomalies
-    param_labels = ["ecc", "sep", "v_mag", "impact_parameter", "theta", "phi", "psi", "true_anomalies"]
+    param_counts = np.array(
+        [3, 3, 2, 2, 2, 2, 2, 3]
+    )  # ecc, sep, v_mag, impact, theta, phi, psi, anomalies
+    param_labels = [
+        "ecc",
+        "sep",
+        "v_mag",
+        "impact_parameter",
+        "theta",
+        "phi",
+        "psi",
+        "true_anomalies",
+    ]
 
     # --- Define bounds as arrays ---
     lower_bounds = np.array([0.0, 2.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0])
-    upper_bounds = np.array([0.99, 50.0, 1.0, 5.0, np.pi/2, 2*np.pi, 2*np.pi, 2*np.pi])
+    upper_bounds = np.array(
+        [0.99, 50.0, 1.0, 5.0, np.pi / 2, 2 * np.pi, 2 * np.pi, 2 * np.pi]
+    )
 
     # Flatten counts and bounds
     n_params = int(np.sum(param_counts))
@@ -42,7 +54,9 @@ def sample_19D_lhs(n_samples, rng=None):
     param_lows = np.zeros(n_params)
     param_highs = np.zeros(n_params)
     idx = 0
-    for label, count, low, high in zip(param_labels, param_counts, lower_bounds, upper_bounds):
+    for label, count, low, high in zip(
+        param_labels, param_counts, lower_bounds, upper_bounds
+    ):
         for i in range(count):
             param_names.append(f"{label}_{i}")
             param_lows[idx] = low
@@ -64,11 +78,9 @@ def sample_19D_lhs(n_samples, rng=None):
     return samples, param_names, distances, weights
 
 
-
-
 # -------------------------
 # Single Simulation
-# ------------------------- 
+# -------------------------
 def _run_single_simulation(args):
     """
     Runs a single simulation given array slices.
@@ -103,7 +115,7 @@ def _run_single_simulation(args):
             impact_parameter,
             psi,
             distance,
-            run_label="MC"
+            run_label="MC",
         )
 
         return outcome, w
@@ -111,21 +123,23 @@ def _run_single_simulation(args):
     except Exception as e:
         return "simulation_failed", w
 
+
 # -------------------------
 # Monte Carlo Simulations
-# ------------------------- 
+# -------------------------
 
 
 @dataclass
 class MonteCarloResult:
-    samples: np.ndarray                 # shape (n_samples, 19)
-    param_names: list                   # list of 19 strings
-    distances: np.ndarray               # shape (n_samples, 2)
-    weights: np.ndarray                 # shape (n_samples,)
-    all_star_outcomes: np.ndarray       # structured array for all stars with >=1 collision
-    weighted_counts: np.ndarray         # array of total weights per outcome
-    probabilities: np.ndarray           # normalized probabilities per outcome
-    unique_outcomes: np.ndarray         # outcome labels
+    samples: np.ndarray  # shape (n_samples, 19)
+    param_names: list  # list of 19 strings
+    distances: np.ndarray  # shape (n_samples, 2)
+    weights: np.ndarray  # shape (n_samples,)
+    all_star_outcomes: np.ndarray  # structured array for all stars with >=1 collision
+    weighted_counts: np.ndarray  # array of total weights per outcome
+    probabilities: np.ndarray  # normalized probabilities per outcome
+    unique_outcomes: np.ndarray  # outcome labels
+
 
 def monte_carlo_19D(n_samples, n_cores=None, verbose=True) -> MonteCarloResult:
     if n_cores is None:
@@ -138,8 +152,11 @@ def monte_carlo_19D(n_samples, n_cores=None, verbose=True) -> MonteCarloResult:
     # Run simulations in parallel
     results = []
     with Pool(processes=n_cores) as pool:
-        for summary_outcome, w in tqdm(pool.imap_unordered(_run_single_simulation, pool_args),
-                                       total=n_samples, disable=not verbose):
+        for summary_outcome, w in tqdm(
+            pool.imap_unordered(_run_single_simulation, pool_args),
+            total=n_samples,
+            disable=not verbose,
+        ):
             results.append((summary_outcome, w))
 
     # Flatten stars with >=1 collision
@@ -149,27 +166,31 @@ def monte_carlo_19D(n_samples, n_cores=None, verbose=True) -> MonteCarloResult:
             continue
         stars = [s for s in summary_outcome if s["collisions"] >= 1]
         for star in stars:
-            all_star_outcomes.append((
-                star["star_key"],
-                star["collisions"],
-                star["n_companions"],
-                star["mass_Msun"],
-                star["outcome"]
-            ))
+            all_star_outcomes.append(
+                (
+                    star["star_key"],
+                    star["collisions"],
+                    star["n_companions"],
+                    star["mass_Msun"],
+                    star["outcome"],
+                )
+            )
             all_star_weights.append(w)
 
     dtype = [
-        ('star_key', 'uint64'),
-        ('collisions', 'int32'),
-        ('n_companions', 'int32'),
-        ('mass_Msun', 'float64'),
-        ('outcome', 'U32')
+        ("star_key", "uint64"),
+        ("collisions", "int32"),
+        ("n_companions", "int32"),
+        ("mass_Msun", "float64"),
+        ("outcome", "U32"),
     ]
     all_star_outcomes_array = np.array(all_star_outcomes, dtype=dtype)
     all_star_weights_array = np.array(all_star_weights, dtype=float)
 
     # Compute weighted counts and probabilities
-    unique_outcomes, inverse_idx = np.unique(all_star_outcomes_array['outcome'], return_inverse=True)
+    unique_outcomes, inverse_idx = np.unique(
+        all_star_outcomes_array["outcome"], return_inverse=True
+    )
     weighted_counts = np.zeros(len(unique_outcomes))
     for idx, w in zip(inverse_idx, all_star_weights_array):
         weighted_counts[idx] += w
@@ -183,6 +204,5 @@ def monte_carlo_19D(n_samples, n_cores=None, verbose=True) -> MonteCarloResult:
         all_star_outcomes=all_star_outcomes_array,
         weighted_counts=weighted_counts,
         probabilities=probabilities,
-        unique_outcomes=unique_outcomes
+        unique_outcomes=unique_outcomes,
     )
-
