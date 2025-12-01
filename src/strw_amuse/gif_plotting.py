@@ -366,6 +366,7 @@ def visualize_initial_final_frames(frames, run_label="test"):
     plt.suptitle(f"Initial and Final Frames: {run_label}", fontsize=16)
 
     png_filename = os.path.join(OUTPUT_DIR_IMG, f"encounter_evolution_{run_label}.png")
+    plt.savefig(png_filename)
     print(f"Comparison png saved as {png_filename}")
     plt.close(fig)
 
