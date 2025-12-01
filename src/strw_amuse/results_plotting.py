@@ -3,13 +3,14 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 # -------------------------
-# Corner Plot 
-# ------------------------- 
+# Corner Plot
+# -------------------------
+
 
 def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
     """
     Generate a corner plot for all samples that produced the given outcome_name.
-    
+
     Parameters
     ----------
     samples : list of dicts
@@ -33,8 +34,14 @@ def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
 
     # build list of parameter names in stable order
     param_order = [
-        "ecc", "sep", "v_mag", "impact_parameter",
-        "theta", "phi", "psi", "true_anomalies"
+        "ecc",
+        "sep",
+        "v_mag",
+        "impact_parameter",
+        "theta",
+        "phi",
+        "psi",
+        "true_anomalies",
     ]
     # count lengths = 3, 3, 2, 2, 2, 2, 2, 3
 
@@ -61,13 +68,15 @@ def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
         show_titles=True,
         title_fmt=".2f",
         quantiles=[0.16, 0.5, 0.84],
-        bins=25
+        bins=25,
     )
 
     plt.show()
 
 
-def plot_corner_marginalized(samples, results, outcome_name="creative_ionized", param_subset=None):
+def plot_corner_marginalized(
+    samples, results, outcome_name="creative_ionized", param_subset=None
+):
     """
     Generate a corner plot for a subset of parameters, marginalizing over the others.
 
@@ -92,7 +101,16 @@ def plot_corner_marginalized(samples, results, outcome_name="creative_ionized", 
 
     # Default to all parameters
     if param_subset is None:
-        param_subset = ["ecc", "sep", "v_mag", "impact_parameter", "theta", "phi", "psi", "true_anomalies"]
+        param_subset = [
+            "ecc",
+            "sep",
+            "v_mag",
+            "impact_parameter",
+            "theta",
+            "phi",
+            "psi",
+            "true_anomalies",
+        ]
 
     # ---- 2. Build matrix of parameters ----
     data = []
@@ -124,7 +142,7 @@ def plot_corner_marginalized(samples, results, outcome_name="creative_ionized", 
         show_titles=True,
         title_fmt=".2f",
         bins=25,
-        weights=weights
+        weights=weights,
     )
 
     plt.show()

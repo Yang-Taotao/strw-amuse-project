@@ -1,12 +1,9 @@
 # Imports
+from dataclasses import dataclass
 from multiprocessing import Pool, cpu_count
-from collections import Counter
 from tqdm import tqdm
-
 import numpy as np
 
-from dataclasses import dataclass
-from amuse.units import units
 from src.strw_amuse.run_simulation import run_6_body_simulation
 
 
@@ -25,7 +22,7 @@ def sample_19D_lhs(n_samples, rng=None):
     """
 
     if rng is None:
-        rng = np.random.default_rng()
+        rng = np.random.default_rng(seed=42)
 
     # --- Define independent parameter counts ---
     param_counts = np.array(

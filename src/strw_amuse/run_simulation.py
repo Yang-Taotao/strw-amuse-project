@@ -18,12 +18,10 @@ from src.strw_amuse.helpers import (
     make_seba_stars,
     make_triple_binary_system,
     outcomes,
-    transformation_to_cartesian
+    transformation_to_cartesian,
 )
 
-from src.strw_amuse.collision import (
-    collision
-)
+from src.strw_amuse.collision import collision
 
 from src.strw_amuse.config import (
     OUTPUT_DIR_COLLISIONS,
@@ -31,8 +29,9 @@ from src.strw_amuse.config import (
     OUTPUT_DIR_LOGS,
     OUTPUT_DIR_SNAPSHOTS,
     OUTPUT_DIR_COLLISION_DIAGNOSTICS,
-    OUTPUT_DIR_OUTCOMES
+    OUTPUT_DIR_OUTCOMES,
 )
+
 
 def run_6_body_simulation(
     sep,
@@ -50,11 +49,12 @@ def run_6_body_simulation(
     age=3.5,
 ):
     """
-    Run a full 6-body simulation combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
+    Run a full 6-body simulation
+    combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
 
-    Uses spherical coordinates for incoming binaries. The first binary is fixed at the origin
-    with orbit in the xy-plane and direction 0. True anomalies (phases) and impact orientations (psi)
-    can be specified for all three binaries.
+    Uses spherical coordinates for incoming binaries.
+    The first binary is fixed at the origin with orbit in the xy-plane and direction 0.
+    True anomalies (phases) and impact orientations (psi) can be specified for all three binaries.
     """
 
     # Create directories
@@ -87,13 +87,13 @@ def run_6_body_simulation(
         theta=theta,
         phi=phi,
         v_mag=v_mag,
-        distance=distance
+        distance=distance,
     )
 
     # Default psi if not provided
     if psi is None:
         psi = [0.0, 0.0, 0.0]
-    
+
     # --------------------------
     # Stellar evolution setup
     # --------------------------
@@ -109,11 +109,8 @@ def run_6_body_simulation(
         centers=centers,
         v_coms=v_vectors,
         phases=phases,
-        psi=psi
+        psi=psi,
     )
-
-
-
 
     initial_particles = grav_particles.copy()
     total_mass = grav_particles.total_mass()
@@ -130,14 +127,16 @@ def run_6_body_simulation(
 
     print("Starting simulation")
     start = time.time()
-    max_time = 20*60
+    max_time = 20 * 60
     gravity.stopping_conditions.collision_detection.enable()
 
     collision_history = []
     # Main evolution loop
     while t < t_end:
         if time.time() - start > max_time:
-            print(f"Runtime exceeded {max_time/60} minutes — stopping simulation at t={t.value_in(units.yr):.1f} yr.")
+            print(
+                f"Runtime > {max_time/60} min -> End sim at t={t.value_in(units.yr):.1f} yr."
+            )
             break
         t += dt
         gravity.evolve_model(t)
@@ -148,7 +147,7 @@ def run_6_body_simulation(
         frames.append(pre_snapshot)
 
         # Collision detection
-        #collision_pairs = gravity.collision_detection()
+        # collision_pairs = gravity.collision_detection()
 
         if gravity.stopping_conditions.collision_detection.is_set():
             sc = gravity.stopping_conditions.collision_detection
@@ -156,10 +155,13 @@ def run_6_body_simulation(
             p2 = sc.particles(1)[0]
             key_i, key_j = p1.key, p2.key
 
-            
-            print(f"Collision detected at {t.value_in(units.yr):.1f} yr between keys {key_i}, {key_j}")
+            print(
+                f"Collision detected at {t.value_in(units.yr):.1f} yr between keys {key_i}, {key_j}"
+            )
 
-            success, remnant = collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label)
+            success, remnant = collision(
+                key_i, key_j, n_collision, gravity, seba, key_map, t, run_label
+            )
             if success:
                 n_collision += 1
                 frames.append(gravity.particles.copy())
@@ -172,7 +174,6 @@ def run_6_body_simulation(
 
                 # Skip to next timestep after collision
                 continue
-
 
     # BEFORE stopping gravity
     final_particles = gravity.particles.copy()
@@ -194,7 +195,12 @@ def run_6_body_simulation(
         return frames
     else:
         if t < t_end:
-            outcome = outcomes(initial_particles, final_particles, collision_history, run_label=run_label)
+            outcome = outcomes(
+                initial_particles,
+                final_particles,
+                collision_history,
+                run_label=run_label,
+            )
             # Save final system
             final_filename = os.path.join(
                 OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
@@ -211,7 +217,12 @@ def run_6_body_simulation(
 
             # Determine final outcome
 
-            outcome = outcomes(initial_particles, final_particles,collision_history, run_label=run_label)
+            outcome = outcomes(
+                initial_particles,
+                final_particles,
+                collision_history,
+                run_label=run_label,
+            )
             print("Final outcome of the system:", outcome)
 
             # Save final system
