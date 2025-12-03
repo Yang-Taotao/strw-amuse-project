@@ -19,7 +19,7 @@ from itertools import combinations
 import helpers
 import run_simulation
 np.random.seed(1)
-system=helpers.make_trinary_system(
+system=helpers.make_triplet(
     50,
     20,
     10,
@@ -31,9 +31,20 @@ system=helpers.make_trinary_system(
     direction=0.0,
     orbit_plane=[0, 0, 1],
     impact_parameter=1.0 | units.AU,
-    f=0.0,  # true anomaly
+    f_a=0.0, 
+    f_b=0.0, # true anomaly
     psi=0.0,  # impact orientation
 )
+params=helpers.transformation_to_cartesian_trip(
+    [10,15,10,15],
+    [50,150,50,150],
+    [0.0,0.0,0.0,0.0],
+    [0.0],
+    [0.0],
+    [0.3],
+    [30]
+)
+print(params[2])
 
 for star in system:
     print(star)
@@ -88,6 +99,8 @@ separations,eccs,velocities,phis,anomalies,thetas,impact,masses,position,psis=he
                                                                                                      psi_min,
                                                                                                      psi_max)
 print(velocities[0][0])
+print(type(thetas[0]), thetas[0])
+print(type(thetas[0][0]), thetas[0][0])
 sim=run_simulation.run_6_body_simulation(
     separations[0],
     anomalies[0],
@@ -100,5 +113,6 @@ sim=run_simulation.run_6_body_simulation(
     position[0],
     'bin',
     masses[0],
-    centers=None,  # <-- impact orientation angles
+    centers=None,
+    case='trip'  # <-- impact orientation angles
     )

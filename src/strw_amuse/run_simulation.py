@@ -13,16 +13,18 @@ from amuse.units import units, nbody_system, constants
 from amuse.community.ph4.interface import ph4
 from amuse.io import write_set_to_file  # , read_set_from_file
 from amuse.datamodel import Particle, Particles
-
+import helpers
 from helpers import (
     make_seba_stars,
     make_triple_binary_system,
     make_sph_from_two_stars,
     detect_close_pair,
     run_fi_collision,
-    critical_velocity,
+    critical_velocity_bin,
+    critical_velocity_trip,
     outcomes,
-    transformation_to_cartesian,
+    transformation_to_cartesian_bin,
+    transformation_to_cartesian_trip
     # compute_remnant_spin,
 )
 
@@ -48,6 +50,7 @@ def run_6_body_simulation(
     masses=[50.0, 50.0, 50.0, 50.0, 50.0, 50.0],
     centers=None,  # <-- impact orientation angles
     age=3.5,
+    case='bin'
 ):
     """
     Run a full 6-body simulation combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
@@ -77,8 +80,9 @@ def run_6_body_simulation(
     # Local init
     frames = []
     n_collision = 0
+    if case=='bin':
 
-    centers, v_vectors, directions, orbit_plane, phases = transformation_to_cartesian(
+        centers, v_vectors, directions, orbit_plane, phases = helpers.transformation_to_cartesian_bin(
         sep=sep,
         true_anomalies=true_anomalies,
         ecc=ecc,
@@ -87,7 +91,16 @@ def run_6_body_simulation(
         v_mag=v_mag,
         distance=distance,
     )
-
+    if case=='trip':
+        centers, v_vectors, directions, orbit_plane, phases = helpers.transformation_to_cartesian_trip(
+        sep=sep,
+        true_anomalies=true_anomalies,
+        ecc=ecc,
+        theta=theta,
+        phi=phi,
+        v_mag=v_mag,
+        distance=distance,
+    )
     # Default psi if not provided
     if psi is None:
         psi = [0.0, 0.0, 0.0]
@@ -96,8 +109,8 @@ def run_6_body_simulation(
     # Stellar evolution setup
     # --------------------------
     seba, seba_particles = make_seba_stars(masses, target_age)
-
-    grav_particles = make_triple_binary_system(
+    if case=='bin':
+        grav_particles = make_triple_binary_system(
         masses=masses,
         seps=sep,
         ecc=ecc,
@@ -109,6 +122,19 @@ def run_6_body_simulation(
         phases=phases,
         psi=psi,
     )
+    elif case=='trip':
+        grav_particles=helpers.make_duo_trinary_system( 
+        masses,
+        sep,
+        ecc,
+        directions,
+        orbit_plane[1:],
+        impact_parameter,
+        centers=centers,
+        v_coms=v_vectors,
+        phases=phases,  # true anomalies
+        psi=psi,
+        )
 
     initial_particles = grav_particles.copy()
     total_mass = grav_particles.total_mass()
