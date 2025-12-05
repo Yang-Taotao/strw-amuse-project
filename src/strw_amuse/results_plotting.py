@@ -1,6 +1,10 @@
+import logging
+
 import corner
 import matplotlib.pyplot as plt
 import numpy as np
+
+logger = logging.getLogger(__name__)
 
 # -------------------------
 # Corner Plot
@@ -25,7 +29,7 @@ def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
     indices = [i for i, (label, _) in enumerate(results) if label == outcome_name]
 
     if len(indices) == 0:
-        print(f"No samples with outcome '{outcome_name}'. Cannot make corner plot.")
+        logger.warning("No samples with outcome '%s'. Cannot make corner plot.", outcome_name)
         return
 
     # ---- 2. Build matrix of parameters ----
@@ -74,9 +78,7 @@ def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
     plt.show()
 
 
-def plot_corner_marginalized(
-    samples, results, outcome_name="creative_ionized", param_subset=None
-):
+def plot_corner_marginalized(samples, results, outcome_name="creative_ionized", param_subset=None):
     """
     Generate a corner plot for a subset of parameters, marginalizing over the others.
 
@@ -96,7 +98,7 @@ def plot_corner_marginalized(
     indices = [i for i, (label, _) in enumerate(results) if label == outcome_name]
 
     if len(indices) == 0:
-        print(f"No samples with outcome '{outcome_name}'. Cannot make corner plot.")
+        logger.warning("No samples with outcome '%s'. Cannot make corner plot.", outcome_name)
         return
 
     # Default to all parameters

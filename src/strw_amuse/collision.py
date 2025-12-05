@@ -2,20 +2,24 @@
 General helper functions for AMUSE simulation.
 """
 
+import logging
+
 # import
 import os
-import numpy as np
 
-from amuse.datamodel.particle_attributes import bound_subset
-from amuse.units import units, constants, nbody_system
+import numpy as np
 from amuse.community.fi.interface import Fi
 from amuse.datamodel import Particle, Particles
+from amuse.datamodel.particle_attributes import bound_subset
 from amuse.io import write_set_to_file  # , read_set_from_file
+from amuse.units import constants, nbody_system, units
 
 from src.strw_amuse.config import (
     OUTPUT_DIR_COLLISIONS,
     OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
 )
+
+logger = logging.getLogger(__name__)
 
 # func repo
 
@@ -70,9 +74,7 @@ def create_sph_star(mass, radius, n_particles=10000, u_value=None, pos_unit=unit
     return sph
 
 
-def create_sph_star_bak(
-    mass, radius, n_particles=10000, u_value=None, pos_unit=units.AU
-):
+def create_sph_star_bak(mass, radius, n_particles=10000, u_value=None, pos_unit=units.AU):
     """
     Create a uniform-density SPH star with safer defaults.
     mass, radius: AMUSE quantities
@@ -85,9 +87,7 @@ def create_sph_star_bak(
 
     # sample radius uniformly in volume (keep units)
     # convert radius to meters for numpy sampling then reattach unit
-    r_vals = (
-        radius.value_in(units.m) * np.random.random(n_particles) ** (1 / 3)
-    ) | units.m
+    r_vals = (radius.value_in(units.m) * np.random.random(n_particles) ** (1 / 3)) | units.m
     theta = np.arccos(2.0 * np.random.random(n_particles) - 1.0)
     phi = 2.0 * np.pi * np.random.random(n_particles)
 
@@ -159,9 +159,7 @@ def make_sph_from_two_stars(stars, n_sph_per_star=100, u_value=None, pos_unit=un
     return gas
 
 
-def run_fi_collision(
-    gas, t_end=0.1 | units.yr, min_mass=1e-6 | units.MSun, run_label="default"
-):
+def run_fi_collision(gas, t_end=0.1 | units.yr, min_mass=1e-6 | units.MSun, run_label="default"):
     """
     Run a Fi SPH collision for a set of particles.
     Writes diagnostics to OUTPUT_DIR_COLLISIONS_DIAGNOSTICS as an AMUSE file.
@@ -224,9 +222,7 @@ def run_fi_collision(
     r = bound_particles.position.value_in(units.m)
     v = bound_particles.velocity.value_in(units.m / units.s)
 
-    L_vec = np.sum(m[:, None] * np.cross(r, v), axis=0) | (
-        units.kg * units.m**2 / units.s
-    )
+    L_vec = np.sum(m[:, None] * np.cross(r, v), axis=0) | (units.kg * units.m**2 / units.s)
 
     r_rel = bound_particles.position - bound_particles.center_of_mass()
     I = (bound_particles.mass * r_rel.lengths() ** 2).sum()
@@ -274,7 +270,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         p_j = next((p for p in gravity.particles if p.key == key_j), None)
 
         if p_i is None or p_j is None:
-            print(f"Collision aborted: keys {key_i},{key_j} not found.")
+            logger.warning("Collision aborted: keys %s,%s not found.", key_i, key_j)
             return False, None
 
         # Build SPH initial conditions
@@ -284,12 +280,8 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         sph = make_sph_from_two_stars(colliders, n_sph_per_star=500)
 
         # --- Pre-collision COM and velocity ---
-        pre_com_pos = (p_i.mass * p_i.position + p_j.mass * p_j.position) / (
-            p_i.mass + p_j.mass
-        )
-        pre_com_vel = (p_i.mass * p_i.velocity + p_j.mass * p_j.velocity) / (
-            p_i.mass + p_j.mass
-        )
+        pre_com_pos = (p_i.mass * p_i.position + p_j.mass * p_j.position) / (p_i.mass + p_j.mass)
+        pre_com_vel = (p_i.mass * p_i.velocity + p_j.mass * p_j.velocity) / (p_i.mass + p_j.mass)
 
         # Center SPH <<- ATTENTION
         sph.position -= sph.center_of_mass()
@@ -306,7 +298,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         gas_out = run_fi_collision(
             sph, t_end=0.1 | units.yr, run_label=f"{run_label}_collision{n_collision}"
         )
-        print("Fi collision done")
+        logger.info("Fi collision done")
 
         # --- Bound particle selection ---
         r = gas_out.position - gas_out.center_of_mass()
@@ -318,7 +310,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         bound_mask = e_spec.value_in(units.m**2 / units.s**2) < 0.0
 
         if not np.any(bound_mask):
-            print("No bound particles found: destructive collision")
+            logger.warning("No bound particles found: destructive collision")
             return remove_colliders(gravity, seba, key_map, [key_i, key_j])
 
         bound_particles = gas_out[bound_mask]
@@ -327,7 +319,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
 
         # --- Very small remnant → destructive ---
         if m_bound <= (5 | units.MSun):
-            print("Very small remnant mass; destructive collision")
+            logger.warning("Very small remnant mass; destructive collision")
             return remove_colliders(gravity, seba, key_map, [key_i, key_j])
 
         # --- Compute remnant velocity preserving SPH internal motion ---
@@ -342,8 +334,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         remnant_radius = remnant_radius  # <<-ATTENTION self assignment of var
         remnant_pos = pre_com_pos
         remnant_vel = pre_com_vel + (
-            bound_particles.center_of_mass_velocity()
-            - gas_out.center_of_mass_velocity()
+            bound_particles.center_of_mass_velocity() - gas_out.center_of_mass_velocity()
         )
 
         # Overwrite p_i with remnant
@@ -367,16 +358,19 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         # Update key_map
         key_map[p_i.key] = remnant_seba
 
-        print(
-            f"Collision {n_collision} finished: remnant = {m_bound.value_in(units.MSun):.2f} Msun, "
-            f"(replacing {key_i}, removed {key_j})"
+        logger.info(
+            "Collision %d finished: remnant = %.2f Msun (replacing %s, removed %s)",
+            n_collision,
+            m_bound.value_in(units.MSun),
+            key_i,
+            key_j,
         )
 
         return True, p_i
 
-    except Exception as e:
-        print("Collision handling failed with exception type:", type(e))
-        print("Exception details:", e)
+    except Exception:
+        # Log full traceback for debugging; do not silently swallow exceptions
+        logger.exception("Collision handling failed for keys %s,%s", key_i, key_j)
         return False, None
 
 

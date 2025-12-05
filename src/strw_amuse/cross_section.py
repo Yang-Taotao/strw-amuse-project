@@ -1,8 +1,9 @@
 # Imports
 from dataclasses import dataclass
 from multiprocessing import Pool, cpu_count
-from tqdm import tqdm
+
 import numpy as np
+from tqdm import tqdm
 
 from src.strw_amuse.run_simulation import run_6_body_simulation
 
@@ -41,9 +42,7 @@ def sample_19D_lhs(n_samples, rng=None):
 
     # --- Define bounds as arrays ---
     lower_bounds = np.array([0.0, 2.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0])
-    upper_bounds = np.array(
-        [0.99, 50.0, 1.0, 5.0, np.pi / 2, 2 * np.pi, 2 * np.pi, 2 * np.pi]
-    )
+    upper_bounds = np.array([0.99, 50.0, 1.0, 5.0, np.pi / 2, 2 * np.pi, 2 * np.pi, 2 * np.pi])
 
     # Flatten counts and bounds
     n_params = int(np.sum(param_counts))
@@ -51,9 +50,7 @@ def sample_19D_lhs(n_samples, rng=None):
     param_lows = np.zeros(n_params)
     param_highs = np.zeros(n_params)
     idx = 0
-    for label, count, low, high in zip(
-        param_labels, param_counts, lower_bounds, upper_bounds
-    ):
+    for label, count, low, high in zip(param_labels, param_counts, lower_bounds, upper_bounds):
         for i in range(count):
             param_names.append(f"{label}_{i}")
             param_lows[idx] = low

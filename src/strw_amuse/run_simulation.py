@@ -7,30 +7,28 @@ Combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
 import os
 import time
 
-# from amuse.lab import *
-
-from amuse.units import units, nbody_system
 from amuse.community.ph4.interface import ph4
 from amuse.io import write_set_to_file  # , read_set_from_file
+from amuse.units import nbody_system, units
 
-
+from src.strw_amuse.collision import collision
+from src.strw_amuse.config import (
+    OUTPUT_DIR_COLLISIONS,
+    OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
+    OUTPUT_DIR_FINAL_STATES,
+    OUTPUT_DIR_LOGS,
+    OUTPUT_DIR_OUTCOMES,
+    OUTPUT_DIR_SNAPSHOTS,
+)
 from src.strw_amuse.helpers import (
     make_seba_stars,
     make_triple_binary_system,
     outcomes,
     transformation_to_cartesian,
 )
+from src.strw_amuse.logging_config import setup_logging
 
-from src.strw_amuse.collision import collision
-
-from src.strw_amuse.config import (
-    OUTPUT_DIR_COLLISIONS,
-    OUTPUT_DIR_FINAL_STATES,
-    OUTPUT_DIR_LOGS,
-    OUTPUT_DIR_SNAPSHOTS,
-    OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
-    OUTPUT_DIR_OUTCOMES,
-)
+# from amuse.lab import *
 
 
 def run_6_body_simulation(
@@ -44,7 +42,7 @@ def run_6_body_simulation(
     distance,
     true_anomalies,
     run_label,
-    masses=[50.0, 50.0, 50.0, 50.0, 50.0, 50.0],
+    masses=None,
     centers=None,  # <-- impact orientation angles
     age=3.5,
 ):
@@ -70,6 +68,10 @@ def run_6_body_simulation(
         if not os.path.exists(d):
             os.makedirs(d, exist_ok=True)
 
+    # initialize logging (MPI-aware)
+    logger = setup_logging(log_dir=OUTPUT_DIR_LOGS)
+    logger.info("Logging initialized for simulation: %s", run_label)
+
     # Set units
     target_age = age | units.Myr
     t_end = 100 | units.yr
@@ -79,6 +81,10 @@ def run_6_body_simulation(
     # Local init
     frames = []
     n_collision = 0
+
+    # default masses (avoid mutable default argument)
+    if masses is None:
+        masses = [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
 
     centers, v_vectors, directions, orbit_plane, phases = transformation_to_cartesian(
         sep=sep,
@@ -125,7 +131,7 @@ def run_6_body_simulation(
         g.mass = s.mass
         g.radius = s.radius
 
-    print("Starting simulation")
+    logger.info("Starting simulation")
     start = time.time()
     max_time = 20 * 60
     gravity.stopping_conditions.collision_detection.enable()
@@ -134,8 +140,8 @@ def run_6_body_simulation(
     # Main evolution loop
     while t < t_end:
         if time.time() - start > max_time:
-            print(
-                f"Runtime > {max_time/60} min -> End sim at t={t.value_in(units.yr):.1f} yr."
+            logger.warning(
+                "Runtime > %.1f min -> End sim at t=%.1f yr.", max_time / 60, t.value_in(units.yr)
             )
             break
         t += dt
@@ -155,8 +161,11 @@ def run_6_body_simulation(
             p2 = sc.particles(1)[0]
             key_i, key_j = p1.key, p2.key
 
-            print(
-                f"Collision detected at {t.value_in(units.yr):.1f} yr between keys {key_i}, {key_j}"
+            logger.info(
+                "Collision detected at %.1f yr between keys %s, %s",
+                t.value_in(units.yr),
+                key_i,
+                key_j,
             )
 
             success, remnant = collision(
@@ -169,7 +178,7 @@ def run_6_body_simulation(
                 collision_history.append([key_i, key_j])
 
                 if remnant is None:
-                    print("Destructive collision -> stopping simulation")
+                    logger.warning("Destructive collision -> stopping simulation")
                     break
 
                 # Skip to next timestep after collision
@@ -182,17 +191,16 @@ def run_6_body_simulation(
     seba.stop()
 
     if len(final_particles) == 0:
-        print(" No particles remaining in the system! Returning defaults.")
+        logger.warning("No particles remaining in the system! Returning defaults.")
         max_mass_particle = None
         max_mass = 0 | units.MSun
         max_velocity = 0 | units.kms
         # Save final system
-        final_filename = os.path.join(
-            OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
-        )
+        final_filename = os.path.join(OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse")
         write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
 
-        return frames
+        # Normalize return shape: always return (frames, outcome)
+        return frames, None
     else:
         if t < t_end:
             outcome = outcomes(
@@ -205,9 +213,7 @@ def run_6_body_simulation(
             final_filename = os.path.join(
                 OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
             )
-            write_set_to_file(
-                final_particles, final_filename, "amuse", overwrite_file=True
-            )
+            write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
 
             return frames, outcome
         else:
@@ -223,14 +229,12 @@ def run_6_body_simulation(
                 collision_history,
                 run_label=run_label,
             )
-            print("Final outcome of the system:", outcome)
+            logger.info("Final outcome of the system: %s", outcome)
 
             # Save final system
             final_filename = os.path.join(
                 OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
             )
-            write_set_to_file(
-                final_particles, final_filename, "amuse", overwrite_file=True
-            )
+            write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
 
             return frames, outcome

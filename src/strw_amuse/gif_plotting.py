@@ -2,16 +2,20 @@
 Plotting utilities for AMUSE simulation.
 """
 
+import logging
+
 # import
 import os
-import numpy as np
-import matplotlib.pyplot as plt
+
 import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
+from amuse.units import units
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-from amuse.units import units
-
 from src.strw_amuse.config import OUTPUT_DIR_GIF, OUTPUT_DIR_IMG
+
+logger = logging.getLogger(__name__)
 
 
 # func repo
@@ -27,7 +31,7 @@ def visualize_frames(frames, run_label="test", massive_threshold=70.0):
     """
 
     if len(frames) == 0:
-        print("Warning: No frames provided.")
+        logger.warning("No frames provided to visualize_frames.")
         return None
 
     output_dir = OUTPUT_DIR_GIF
@@ -40,7 +44,7 @@ def visualize_frames(frames, run_label="test", massive_threshold=70.0):
     if len(massive_indices) == 0:
         massive_indices = [np.argmax(final_masses)]
     n_massive = len(massive_indices)
-    print(f"Tracking {n_massive} massive stars in final frame")
+    logger.info("Tracking %d massive stars in final frame", n_massive)
 
     # --- Extract positions of tracked stars in each frame ---
     tracked_positions = np.zeros((len(frames), n_massive, 2))
@@ -145,7 +149,7 @@ def visualize_frames(frames, run_label="test", massive_threshold=70.0):
     writer = PillowWriter(fps=10)
     ani.save(gif_filename, writer=writer)
     plt.close(fig)
-    print(f"GIF saved as {gif_filename}")
+    logger.info("GIF saved as %s", gif_filename)
 
 
 def visualize_initial_final_frames(frames, run_label="test"):
@@ -160,7 +164,7 @@ def visualize_initial_final_frames(frames, run_label="test"):
     # 0. Safety checks
     # ---------------------------------------------------------
     if len(frames) == 0:
-        print("Warning: No frames provided.")
+        logger.warning("No frames provided to visualize_initial_final_frames.")
         return
 
     output_dir = OUTPUT_DIR_IMG
@@ -367,7 +371,7 @@ def visualize_initial_final_frames(frames, run_label="test"):
 
     png_filename = os.path.join(OUTPUT_DIR_IMG, f"encounter_evolution_{run_label}.png")
     plt.savefig(png_filename)
-    print(f"Comparison png saved as {png_filename}")
+    logger.info("Comparison png saved as %s", png_filename)
     plt.close(fig)
 
     return None
