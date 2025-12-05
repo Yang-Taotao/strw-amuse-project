@@ -5,8 +5,8 @@ Main script for running the 6-body encounter simulation and visualization.
 # %%
 # import
 from src.strw_amuse.config import PARAM_REF, PARAM_TEST
-from src.strw_amuse.run_simulation import run_6_body_simulation
 from src.strw_amuse.gif_plotting import visualize_frames, visualize_initial_final_frames
+from src.strw_amuse.run_simulation import run_6_body_simulation
 
 # %%
 # Run sim - no encounter

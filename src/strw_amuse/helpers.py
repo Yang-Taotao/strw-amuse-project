@@ -4,14 +4,14 @@ General helper functions for AMUSE simulation.
 
 # import
 import os
-import numpy as np
 
-from amuse.datamodel.particle_attributes import bound_subset
-from amuse.units import units, constants
-from amuse.units.quantities import VectorQuantity
+import numpy as np
 from amuse.community.seba.interface import SeBa
-from amuse.datamodel import Particles, Particle
+from amuse.datamodel import Particle, Particles
+from amuse.datamodel.particle_attributes import bound_subset
 from amuse.io import write_set_to_file  # , read_set_from_file
+from amuse.units import constants, units
+from amuse.units.quantities import VectorQuantity
 
 from src.strw_amuse.config import OUTPUT_DIR_COLLISIONS_OUTCOMES
 
@@ -123,7 +123,7 @@ def make_binary(
     e=0.0,
     center=None,
     direction=0.0,
-    orbit_plane=[0, 0, 1],
+    orbit_plane=None,
     impact_parameter=0.0 | units.AU,
     f=0.0,  # true anomaly
     psi=0.0,  # impact orientation
@@ -132,15 +132,15 @@ def make_binary(
     Create a binary system with arbitrary eccentricity, orbit plane, phase, and impact orientation.
     """
 
+    # avoid mutable default for orbit_plane
+    if orbit_plane is None:
+        orbit_plane = [0, 0, 1]
+
     plane = np.array(orbit_plane, dtype=float)
     plane /= np.linalg.norm(plane)
 
     # Reference vector perpendicular to orbit plane
-    ref = (
-        np.array([1, 0, 0])
-        if abs(np.dot(plane, [1, 0, 0])) < 0.9
-        else np.array([0, 1, 0])
-    )
+    ref = np.array([1, 0, 0]) if abs(np.dot(plane, [1, 0, 0])) < 0.9 else np.array([0, 1, 0])
     off_set_dir = np.cross(plane, ref)
     off_set_dir /= np.linalg.norm(off_set_dir)
 
@@ -258,9 +258,7 @@ def critical_velocity(masses, sep, ecc):
     v_crit : float
         Critical velocity (in km/s) for the encounter.
     """
-    G = constants.G.in_(
-        units.AU**3 / (units.MSun * units.day**2)
-    )  # AU^3 / (MSun * day^2)
+    G = constants.G.in_(units.AU**3 / (units.MSun * units.day**2))  # AU^3 / (MSun * day^2)
     G = G.value_in(units.kms**2 * units.AU / units.MSun)  # km^2/s^2 * AU / MSun
 
     m1, m2, m3, m4, m5, m6 = masses
@@ -418,9 +416,7 @@ def transformation_to_cartesian(
         centers, v_vectors, directions, orbit_plane, phases
     """
     if len(theta) != 2 or len(phi) != 2 or len(v_mag) != 2 or len(distance) != 2:
-        raise ValueError(
-            "theta, phi, v_mag, distance must all have length 2 (for B and C)"
-        )
+        raise ValueError("theta, phi, v_mag, distance must all have length 2 (for B and C)")
 
     # --------------------------
     # Compute critical velocity
@@ -470,9 +466,7 @@ def transformation_to_cartesian(
             angle = 0.0
         else:
             v_proj /= np.linalg.norm(v_proj)
-            angle = np.arctan2(
-                np.dot(np.cross(ref, v_proj), n_unit), np.dot(ref, v_proj)
-            )
+            angle = np.arctan2(np.dot(np.cross(ref, v_proj), n_unit), np.dot(ref, v_proj))
         directions.append(float(angle))
 
         # Phase

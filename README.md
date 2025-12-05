@@ -220,4 +220,4 @@ def plotter(args):
     plt.save(f"cmap_{time}")
 ```
 
-<\details>
+</details>
