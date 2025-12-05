@@ -13,6 +13,7 @@ from amuse.community.seba.interface import SeBa
 from amuse.datamodel import Particles, Particle
 from amuse.io import write_set_to_file  # , read_set_from_file
 
+from src.strw_amuse.config import OUTPUT_DIR_COLLISIONS_OUTCOMES
 
 # func repo
 
@@ -290,7 +291,7 @@ def outcomes(
     massive_threshold=70 | units.MSun,
     creative_threshold=10 | units.MSun,
     run_label="sim",
-    output_dir="./collision_outcomes",
+    output_dir=OUTPUT_DIR_COLLISIONS_OUTCOMES,
 ):
     """
     Compute and save outcomes for each final star using explicit collision mapping.

@@ -28,21 +28,21 @@ from src.strw_amuse.config import (
     OUTPUT_DIR_FINAL_STATES,
     OUTPUT_DIR_LOGS,
     OUTPUT_DIR_SNAPSHOTS,
-    OUTPUT_DIR_COLLISION_DIAGNOSTICS,
+    OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
     OUTPUT_DIR_OUTCOMES,
 )
 
 
 def run_6_body_simulation(
     sep,
-    true_anomalies,
     ecc,
-    theta,
-    phi,
     v_mag,
     impact_parameter,
+    theta,
+    phi,
     psi,
     distance,
+    true_anomalies,
     run_label,
     masses=[50.0, 50.0, 50.0, 50.0, 50.0, 50.0],
     centers=None,  # <-- impact orientation angles
@@ -63,7 +63,7 @@ def run_6_body_simulation(
         OUTPUT_DIR_FINAL_STATES,
         OUTPUT_DIR_LOGS,
         OUTPUT_DIR_SNAPSHOTS,
-        OUTPUT_DIR_COLLISION_DIAGNOSTICS,
+        OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
         OUTPUT_DIR_OUTCOMES,
     )
     for d in output_dirs:

@@ -14,13 +14,65 @@ from amuse.io import write_set_to_file  # , read_set_from_file
 
 from src.strw_amuse.config import (
     OUTPUT_DIR_COLLISIONS,
-    OUTPUT_DIR_COLLISION_DIAGNOSTICS,
+    OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
 )
 
 # func repo
 
 
 def create_sph_star(mass, radius, n_particles=10000, u_value=None, pos_unit=units.AU):
+    """
+    Create a uniform-density SPH star with safer defaults.
+    mass, radius: AMUSE quantities
+    pos_unit: coordinate unit for output positions
+    """
+    sph = Particles(n_particles)
+
+    # set per-particle mass (AMUSE broadcasts quantity)
+    sph.mass = mass / n_particles
+
+    # sample radius uniformly in volume (keep units)
+    # convert radius to meters for numpy sampling then reattach unit
+    rng = np.random.default_rng(seed=42)
+    r_vals = (radius.value_in(units.m) * rng.random(n_particles) ** (1 / 3)) | units.m
+    theta = np.arccos(2.0 * rng.random(n_particles) - 1.0)
+    phi = 2.0 * np.pi * rng.random(n_particles)
+
+    x = r_vals * np.sin(theta) * np.cos(phi)
+    y = r_vals * np.sin(theta) * np.sin(phi)
+    z = r_vals * np.cos(theta)
+
+    # attach coordinates in requested unit
+    sph.x = x.in_(pos_unit)
+    sph.y = y.in_(pos_unit)
+    sph.z = z.in_(pos_unit)
+
+    # velocities zero in star frame
+    sph.vx = 0.0 | units.kms
+    sph.vy = 0.0 | units.kms
+    sph.vz = 0.0 | units.kms
+
+    # internal energy estimate
+    if u_value is None:
+        # virial-ish estimate: u ~ 0.2 * G M / R  (units J/kg)
+        u_est = 0.2 * (constants.G * mass / radius)
+        sph.u = u_est
+    else:
+        sph.u = u_value
+
+    # compute a mean inter-particle spacing in meters and set h_smooth to a safe fraction
+    mean_sep = ((4 / 3.0) * np.pi * (radius.value_in(units.m) ** 3) / n_particles) ** (
+        1 / 3
+    ) | units.m
+    # choose smoothing length ~ 1.2 * mean_sep (safe number of neighbors)
+    sph.h_smooth = (1.2 * mean_sep).in_(pos_unit)
+
+    return sph
+
+
+def create_sph_star_bak(
+    mass, radius, n_particles=10000, u_value=None, pos_unit=units.AU
+):
     """
     Create a uniform-density SPH star with safer defaults.
     mass, radius: AMUSE quantities
@@ -112,7 +164,7 @@ def run_fi_collision(
 ):
     """
     Run a Fi SPH collision for a set of particles.
-    Writes diagnostics to OUTPUT_DIR_COLLISION_DIAGNOSTICS as an AMUSE file.
+    Writes diagnostics to OUTPUT_DIR_COLLISIONS_DIAGNOSTICS as an AMUSE file.
     Returns: (gas_out, diag_summary_dict)
     """
 
@@ -202,7 +254,7 @@ def run_fi_collision(
 
     # file name
     diag_filename = os.path.join(
-        OUTPUT_DIR_COLLISION_DIAGNOSTICS, f"collision_diag_{run_label}.amuse"
+        OUTPUT_DIR_COLLISIONS_DIAGNOSTICS, f"collision_diag_{run_label}.amuse"
     )
 
     write_set_to_file(diag_particles, diag_filename, "amuse", overwrite_file=True)
