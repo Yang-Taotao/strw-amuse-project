@@ -45,3 +45,6 @@ dependencies:
   - scipy
   - tqdm
   - corner
+  - flake8
+  - black
+  - isort

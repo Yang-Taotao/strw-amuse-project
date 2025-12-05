@@ -9,7 +9,7 @@ This is the README document for strw-amuse-project, a project for the 2025 [***S
 - [strw-amuse-project](#strw-amuse-project)
   - [Index](#index)
   - [Collaborators](#collaborators)
-  - [Usage](#usage)
+  - [Usage and Notes](#usage-and-notes)
   - [Goals](#goals)
     - [Idea](#idea)
     - [Example I/O](#example-io)
@@ -30,15 +30,16 @@ We list the collaborators in alphabetical order.
 | **Marc Seegers**       | [seegers@strw.leidenuniv.nl](mailto:seegers@strw.leidenuniv.nl)         | MSc Astronomy | Leiden University |
 | **Taotao Yang**        | [tyang@strw.leidenuniv.nl](mailto:tyang@strw.leidenuniv.nl)             | MSc Astronomy | Leiden University |
 
-## Usage
+## Usage and Notes
 
 ![Linux](https://img.shields.io/badge/-Linux-grey?logo=linux)
-![macOS](https://img.shields.io/badge/-OSX-black?logo=apple)
 
-- Run scripts from [main.py](./main.py)
-- Check [Documentation](./docs/AMUSE_Install_v2025.9.0.md) for AMUSE installation setup and example script for simulations.
+- Run scripts from [`main.py`](./main.py)
+- Check [`Documentation`](./docs/AMUSE_Install_v2025.9.0.md) for AMUSE installation setup and example script for simulations.
 - AMUSE [`v2025.9.0`](https://github.com/amusecode/amuse/releases/tag/v2025.9.0) required for current project.
-- Conda [env](./environment.yml) recommended.
+- Conda [`env`](./environment.yml) recommended. Replicate with provided file.
+- See [`pyproject.toml`](./pyproject.toml) for `Black` config.
+- See [`setup.cfg`](./setup.cfg) for `isort` and `flake8` config.
 
 ## Goals
 
