@@ -22,10 +22,17 @@ from src.strw_amuse.config import (
 from src.strw_amuse.helpers import (
     make_seba_stars,
     make_triple_binary_system,
-    outcomes,
     transformation_to_cartesian,
 )
 from src.strw_amuse.logging_config import setup_logging
+from src.strw_amuse.stopping import (
+    find_bound_groups,
+    group_com,
+    group_physical_size,
+    is_ionized_single,
+    outcomes,
+    specific_pair_energy,
+)
 
 
 def run_6_body_simulation(
@@ -82,6 +89,9 @@ def run_6_body_simulation(
     # default masses (avoid mutable default argument)
     if masses is None:
         masses = [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
+    # Default psi if not provided
+    if psi is None:
+        psi = [0.0, 0.0, 0.0]
 
     centers, v_vectors, directions, orbit_plane, phases = transformation_to_cartesian(
         sep=sep,
@@ -92,10 +102,6 @@ def run_6_body_simulation(
         v_mag=v_mag,
         distance=distance,
     )
-
-    # Default psi if not provided
-    if psi is None:
-        psi = [0.0, 0.0, 0.0]
 
     # --------------------------
     # Stellar evolution setup
@@ -134,6 +140,7 @@ def run_6_body_simulation(
     gravity.stopping_conditions.collision_detection.enable()
 
     collision_history = []
+    check_every = 10 | units.yr
     # Main evolution loop
     while t < t_end:
         if time.time() - start > max_time:
@@ -181,57 +188,123 @@ def run_6_body_simulation(
                 # Skip to next timestep after collision
                 continue
 
-    # BEFORE stopping gravity
-    final_particles = gravity.particles.copy()
+        # Periodic check every 10 yrs
+        # -> it stops simulation when either:
+        # 1. desired outcome has happened or 2. has not happened and not about to happen.
+        if t >= check_every:
+            check_every += 10 | units.yr
 
-    gravity.stop()
-    seba.stop()
+            particles = gravity.particles
+            n_part = len(particles)
 
-    if len(final_particles) == 0:
-        logger.warning("No particles remaining in the system! Returning defaults.")
-        # max_mass_particle = None
-        # max_mass = 0 | units.MSun
-        # max_velocity = 0 | units.kms
-        # Save final system
-        final_filename = os.path.join(OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse")
-        write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+            # 1) Desired outcome: any single (ionized) star > MASS_THRESHOLD
+            MASS_THRESHOLD = 70.0 | units.MSun
+            massive_indices = [i for i, p in enumerate(particles) if p.mass > MASS_THRESHOLD]
 
-        # Normalize return shape: always return (frames, outcome)
-        return frames, None
-    else:
-        if t < t_end:
-            outcome = outcomes(
-                initial_particles,
-                final_particles,
-                collision_history,
-                run_label=run_label,
-            )
-            # Save final system
-            final_filename = os.path.join(
-                OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
-            )
-            write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+            for idx in massive_indices:
+                if is_ionized_single(idx, particles):
+                    mass_msun = particles[idx].mass.in_(units.MSun).number  # extract float
+                    logger.info(
+                        "Desired outcome seen at t=%.1f yr: particle %s mass=%.3f Msun is ionized.",
+                        t.value_in(units.yr),
+                        particles[idx].key,
+                        mass_msun,
+                    )
 
-            return frames, outcome
-        else:
-            # max_mass_particle = max(final_particles, key=lambda p: p.mass)
-            # max_mass = max_mass_particle.mass
-            # max_velocity = max_mass_particle.velocity.length()
+                    # finalize and exit returning outcome
+                    final_particles = gravity.particles.copy()
+                    gravity.stop()
+                    seba.stop()
+                    outcome = outcomes(
+                        initial_particles, final_particles, collision_history, run_label=run_label
+                    )
+                    final_filename = os.path.join(
+                        OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
+                    )
+                    write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+                    return frames, outcome
 
-            # Determine final outcome
+            # 2) Check if system is dilute & unbound:
+            # min pairwise distance > FAR_DISTANCE and no bound pairs
+            FAR_DISTANCE = 200.0 | units.AU
+            min_pair_distance = None
+            any_bound_pair = False
+            for i in range(n_part):
+                for j in range(i + 1, n_part):
+                    d = (particles[i].position - particles[j].position).length()
+                    if (min_pair_distance is None) or (d < min_pair_distance):
+                        min_pair_distance = d
+                    E = specific_pair_energy(particles[i], particles[j])
+                    # specific_pair_energy returns specific energy (m^2 / s^2) — test sign directly
+                    if E.value_in(units.m**2 / units.s**2) < 0:
+                        any_bound_pair = True
 
-            outcome = outcomes(
-                initial_particles,
-                final_particles,
-                collision_history,
-                run_label=run_label,
-            )
-            logger.info("Final outcome of the system: %s", outcome)
+            if (
+                (min_pair_distance is not None)
+                and (min_pair_distance > FAR_DISTANCE)
+                and (not any_bound_pair)
+            ):
+                logger.info(
+                    "System is dilute & unbound at t=%.1f yr (min distance=%.1f AU). Stopping.",
+                    t.value_in(units.yr),
+                    min_pair_distance.in_(units.AU),
+                )
+                final_particles = gravity.particles.copy()
+                gravity.stop()
+                seba.stop()
+                outcome = outcomes(
+                    initial_particles, final_particles, collision_history, run_label=run_label
+                )
+                final_filename = os.path.join(
+                    OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
+                )
+                write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+                return frames, outcome
 
-            # Save final system
-            final_filename = os.path.join(
-                OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
-            )
-            write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+            # 3) If there are bound groups,
+            # check if they are compact and mutually well-separated (stable)
+            groups = find_bound_groups(particles)
+            if len(groups) >= 1:
+                group_sizes = [group_physical_size(particles, g) for g in groups]
+                group_coms = [group_com(particles, g) for g in groups]
 
-            return frames, outcome
+                compact_threshold = 100.0 | units.AU
+                all_compact = all(
+                    (sz < compact_threshold) or (len(g) == 1) for sz, g in zip(group_sizes, groups)
+                )
+
+                well_separated = True
+                STABLE_FACTOR = 50.0  # increase factor to make criterion looser
+                for i_g in range(len(groups)):
+                    for j_g in range(i_g + 1, len(groups)):
+                        # ignore singletons when considering group separation
+                        if len(groups[i_g]) == 1 and len(groups[j_g]) == 1:
+                            continue
+                        sep = (group_coms[i_g] - group_coms[j_g]).length()
+                        size_max = max(group_sizes[i_g], group_sizes[j_g])
+                        if size_max.value_in(units.AU) == 0:
+                            size_max = 1.0 | units.AU
+
+                        if sep <= (STABLE_FACTOR * size_max):
+                            well_separated = False
+                            break
+                    if not well_separated:
+                        break
+
+                if all_compact and well_separated:
+                    logger.info(
+                        "System consists of compact bound groups mutually well-separated at "
+                        "t=%.1f yr -> declaring stable and stopping.",
+                        t.value_in(units.yr),
+                    )
+                    final_particles = gravity.particles.copy()
+                    gravity.stop()
+                    seba.stop()
+                    outcome = outcomes(
+                        initial_particles, final_particles, collision_history, run_label=run_label
+                    )
+                    final_filename = os.path.join(
+                        OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
+                    )
+                    write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+                    return frames, outcome

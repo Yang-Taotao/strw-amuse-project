@@ -2,17 +2,11 @@
 General helper functions for AMUSE simulation.
 """
 
-import os
-
 import numpy as np
 from amuse.community.seba.interface import SeBa
 from amuse.datamodel import Particle, Particles
-from amuse.datamodel.particle_attributes import bound_subset
-from amuse.io import write_set_to_file
 from amuse.units import constants, units
 from amuse.units.quantities import VectorQuantity
-
-from src.strw_amuse.config import OUTPUT_DIR_COLLISIONS_OUTCOMES
 
 
 def make_triple_binary_system(
@@ -277,117 +271,6 @@ def critical_velocity(masses, sep, ecc):
     v_crit = np.sqrt(-2 * total_energy / reduced_mass)  # in km/s
 
     return v_crit
-
-
-def outcomes(
-    initial_particles,
-    final_particles,
-    collision_history,
-    massive_threshold=70 | units.MSun,
-    creative_threshold=10 | units.MSun,
-    run_label="sim",
-    output_dir=OUTPUT_DIR_COLLISIONS_OUTCOMES,
-):
-    """
-    Compute and save outcomes for each final star using explicit collision mapping.
-
-    Stores all outcomes in an AMUSE file, returns the 'most interesting' outcome
-    (stars with exactly 1 collision) for quick printing.
-
-    Parameters:
-    -----------
-    initial_particles : Particles
-        Initial stars.
-    final_particles : Particles
-        Final stars.
-    collision_history : list of [key_i, key_j]
-        Keys of stars that collided.
-    massive_threshold : quantity
-        Mass above which a remnant is considered massive.
-    creative_threshold : quantity
-        Mass below which a collision is destructive.
-    run_label : str
-        Label used for output filename.
-    output_dir : str
-        Directory to save outcomes AMUSE file.
-
-    Returns:
-    --------
-    most_interesting : list of dict
-        Stars that participated in exactly 1 collision.
-    """
-
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
-
-    if isinstance(final_particles, list):
-        final_particles = Particles(final_particles)
-        # <<-ERROR
-        # type list[Unkonwn] cannot be assigned to param size of type int in function __init__
-
-    # Build mapping: final star key -> number of collisions
-    collisions_per_star = {p.key: 0 for p in final_particles}
-    for key_i, key_j in collision_history:
-        for star in final_particles:
-            if star.key == key_i or star.key == key_j:
-                collisions_per_star[star.key] += 1
-                break
-
-    # Create Particles set for AMUSE output
-    outcome_particles = Particles()
-
-    summary_outcome = []
-
-    for star in final_particles:
-        ncoll = collisions_per_star.get(star.key, 0)
-        M = star.mass
-
-        # Determine outcome
-        if ncoll == 0:
-            outcome_type = "No_collision"
-            ncomp = 0
-        elif M < creative_threshold:
-            outcome_type = "Destructive"
-            ncomp = 0
-        elif M < massive_threshold:
-            outcome_type = "Creative_not_massive"
-            ncomp = 0
-        else:
-            # Massive star: bound vs ionized
-            bound = bound_subset(final_particles, core=star)
-            ncomp = len(bound) - 1
-            outcome_type = "Creative_bound" if ncomp > 0 else "Creative_ionized"
-
-        # Add a particle for this star with attributes storing outcome info
-        p = Particle()
-        p.key = star.key
-        p.mass = M
-        p.radius = star.radius
-        p.position = star.position
-        p.velocity = star.velocity
-        # custom attributes for outcome info
-        p.outcome_type = outcome_type
-        p.n_collisions = ncoll
-        p.n_companions = ncomp
-        outcome_particles.add_particle(p)
-
-        # Collect most interesting outcomes for print
-        if ncoll >= 1:
-            summary_outcome.append(
-                {
-                    "star_key": star.key,
-                    "outcome": outcome_type,
-                    "collisions": ncoll,
-                    "mass_Msun": M.value_in(units.MSun),
-                    "n_companions": ncomp,
-                }
-            )
-
-    # Save outcomes to AMUSE file
-    filename = os.path.join(output_dir, f"outcomes_{run_label}.amuse")
-    write_set_to_file(outcome_particles, filename, "amuse", overwrite_file=True)
-
-    return summary_outcome
 
 
 def transformation_to_cartesian(
