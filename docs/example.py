@@ -4,12 +4,11 @@ Example script from AMUSE lecture 2025-10-29.
 
 # imports
 import numpy as np
-from matplotlib import pyplot as plt
-
-from amuse.lab import *
 from amuse.couple import bridge
 from amuse.ext.orbital_elements import orbital_elements_from_binary
 from amuse.ext.protodisk import ProtoPlanetaryDisk
+from amuse.lab import *
+from matplotlib import pyplot as plt
 
 # here is my lirbary
 

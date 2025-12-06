@@ -6,11 +6,19 @@ This is the README document for strw-amuse-project, a project for the 2025 [***S
 
 ## Index
 
-* [Collaborators](#collaborators)
-* [Usage](#usage)
-* [Goals](#goals)
-* [Grading](#grading-rubric)
-* [Archived](#archived)
+- [strw-amuse-project](#strw-amuse-project)
+  - [Index](#index)
+  - [Collaborators](#collaborators)
+  - [Usage and Notes](#usage-and-notes)
+  - [Goals](#goals)
+    - [Idea](#idea)
+    - [Example I/O](#example-io)
+    - [Pipeline](#pipeline)
+  - [Grading rubric](#grading-rubric)
+  - [Archived](#archived)
+    - [Steps](#steps)
+    - [Configs](#configs)
+    - [Alternative Approach](#alternative-approach)
 
 ## Collaborators
 
@@ -22,44 +30,66 @@ We list the collaborators in alphabetical order.
 | **Marc Seegers**       | [seegers@strw.leidenuniv.nl](mailto:seegers@strw.leidenuniv.nl)         | MSc Astronomy | Leiden University |
 | **Taotao Yang**        | [tyang@strw.leidenuniv.nl](mailto:tyang@strw.leidenuniv.nl)             | MSc Astronomy | Leiden University |
 
-## Usage
+## Usage and Notes
 
 ![Linux](https://img.shields.io/badge/-Linux-grey?logo=linux)
-![macOS](https://img.shields.io/badge/-OSX-black?logo=apple)
 
-* Run scripts with [main.py](./main.py)
-* Check [Documentation](./docs/AMUSE_Install_v2025.9.0.md) for AMUSE installation setup.
-* AMUSE [`v2025.9.0`](https://github.com/amusecode/amuse/releases/tag/v2025.9.0) required for current project.
-* Conda [env](./environment.yml) recommended.
+- Run scripts from [`main.py`](./main.py)
+- Check [`Documentation`](./docs/AMUSE_Install_v2025.9.0.md) for AMUSE installation setup and example script for simulations.
+- AMUSE [`v2025.9.0`](https://github.com/amusecode/amuse/releases/tag/v2025.9.0) required for current project.
+- Conda [`env`](./environment.yml) recommended. Replicate with provided file.
+- See [`pyproject.toml`](./pyproject.toml) for `Black` config.
+- See [`setup.cfg`](./setup.cfg) for `isort` and `flake8` config.
 
 ## Goals
 
-### Revised idea
+Generate probability estimation of pistol star formation based off of some configurations of star system interactions in a cluster.
 
-A rough outline of the revised idea:
+### Idea
 
-* General: shoot triple/bin at some triple/bin sys
-* Localized environment of space
-* Fixed host triplet/quintuplet system <- shoot some bin/triplet at the host from all points on a sphere
-* How many of these trails have pistol ejected -> prob
-* More likely to form in bin-bin-bin or tri-tri
-* Assume close encounter event of bin-bin-bin or tri-tri has happened in some cluster
-* Distant effect of other stars in the cluster -> trivial
+A rough outline follows:
 
-### In detail
+- General: shoot a triplet or binary at some host triplet and binary-binary system
+- Localized space environment
+- Fixed host triplet/quintuplet system <- shoot some bin/triplet at the host from all points on a sphere
+- How many of these trails have pistol ejected -> probability
+- More likely to form in bin-bin-bin or tri-tri configuration
+- Assume close encounter event of bin-bin-bin or tri-tri has happened in some cluster
+- Distant effect of other stars in the cluster -> trivial
+
+### Example I/O
 
 > I/O
 >
 > Input:
 >
-> * host_system_param(triplet or bin-bin) <- mass, velocity, location, separation, etc
-> * variable_system_param(triplet or bin) <- mass, velocity, location, separation, etc
+> - host_system_param(triplet or bin-bin) <- mass, velocity, location, separation, etc
+> - variable_system_param(triplet or bin) <- mass, velocity, location, separation, etc
 >
 > Output:\
 >
-> * ejection_flag(True or False)
-> * ejected_param(mass, velocity)
+> - ejection_flag(True or False)
+> - ejected_param(mass, velocity)
 >
+
+### Pipeline
+
+> I/O
+>
+> 1. Set CONFIG file or entries -> config.py
+> 2. Build parameter_array enteries based off of CONFIG -> param = param_build(config)
+> 3. Run simulation with parameter_array -> sim_results = run_sim(param)
+> 4. Visualization and probability estimation -> output = visualization(sim_results)
+>
+
+Ideally, we should be able to call and use the package as follows:
+
+```py
+# import
+from project_name import config, magic
+# generate results
+magic(config)
+```
 
 ## Grading rubric
 
@@ -190,4 +220,4 @@ def plotter(args):
     plt.save(f"cmap_{time}")
 ```
 
-<\details>
+</details>

@@ -1,134 +1,137 @@
-# import librarie
+"""
+Plotting utilities for AMUSE simulation.
+"""
 
-
-import numpy as np
-import matplotlib.pyplot as plt
-from matplotlib.animation import FuncAnimation, PillowWriter
-import matplotlib.cm as cm
-import matplotlib.colors as mcolors
+import logging
 import os
+
+import matplotlib.colors as mcolors
+import matplotlib.pyplot as plt
+import numpy as np
 from amuse.units import units
+from matplotlib.animation import FuncAnimation, PillowWriter
+
+from src.strw_amuse.config import OUTPUT_DIR_GIF, OUTPUT_DIR_IMG
+
+logger = logging.getLogger(__name__)
 
 
-def visualize_frames(frames, run_label="test"):
+def visualize_frames(frames, run_label="test", massive_threshold=70.0):
     """
     Visualize AMUSE simulation frames and produce a GIF.
 
-    Centered on the most massive star in the final frame.
-    Tracks all other stars relative to that one.
-    Color-coded by stellar mass (with colorbar).
+    For the final frame, finds all stars with mass >= massive_threshold M☉.
+    Produces one subplot per massive star.
+    Each subplot tracks the corresponding star through all frames.
+    Axis limits are fixed to [-100, 100] AU.
+    Color-coded by stellar mass with a shared colorbar.
     """
 
     if len(frames) == 0:
-        print("⚠️ No frames provided.")
-        return
+        logger.warning("No frames provided to visualize_frames.")
+        return None
 
-    os.makedirs("Gif-6body", exist_ok=True)
+    output_dir = OUTPUT_DIR_GIF
+    os.makedirs(output_dir, exist_ok=True)
 
-    # --- Gather all masses for color normalization ---
-    all_masses = np.array([p.mass.value_in(units.MSun) for f in frames for p in f])
-    m_min, m_max = all_masses.min(), all_masses.max()
-    cmap = plt.get_cmap("plasma")
-    norm = mcolors.Normalize(vmin=m_min, vmax=m_max)
-    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
-
-    def mass_to_color(mass):
-        return cmap(norm(mass))
-
-    # --- Find most massive star in final frame ---
+    # --- Identify most massive stars in the final frame ---
     final_frame = frames[-1]
     final_masses = np.array([p.mass.value_in(units.MSun) for p in final_frame])
-    max_index = np.argmax(final_masses)
-    print(
-        f"Tracking most massive star (index {max_index}) with final mass {final_masses[max_index]:.2f} M☉"
-    )
+    massive_indices = np.where(final_masses >= massive_threshold)[0]
+    if len(massive_indices) == 0:
+        massive_indices = [np.argmax(final_masses)]
+    n_massive = len(massive_indices)
+    logger.info("Tracking %d massive stars in final frame", n_massive)
 
-    # Extract its position at each frame (to recenter) and handle frames with different particle counts:
-    # Prefer the same index when possible, otherwise pick the nearest particle to the final tracked star position.
-    final_particle = final_frame[max_index]
-    final_pos = np.array(
-        [final_particle.x.value_in(units.AU), final_particle.y.value_in(units.AU)]
-    )
-    tracked_positions_list = []
-    for f in frames:
-        if len(f) == 0:
-            tracked_positions_list.append([0.0, 0.0])
-            continue
-        # if the same index exists in this frame, use it
-        if max_index < len(f):
-            p = f[max_index]
-            tracked_positions_list.append(
-                [p.x.value_in(units.AU), p.y.value_in(units.AU)]
-            )
-        else:
-            # fallback: find nearest particle to the final position
-            xs = np.array([p.x.value_in(units.AU) for p in f])
-            ys = np.array([p.y.value_in(units.AU) for p in f])
-            dists = np.hypot(xs - final_pos[0], ys - final_pos[1])
-            idx = int(np.argmin(dists))
-            p = f[idx]
-            tracked_positions_list.append(
-                [p.x.value_in(units.AU), p.y.value_in(units.AU)]
-            )
-    tracked_positions = np.array(tracked_positions_list)
+    # --- Extract positions of tracked stars in each frame ---
+    tracked_positions = np.zeros((len(frames), n_massive, 2))
+    for f_idx, frame in enumerate(frames):
+        for idx_i, star_idx in enumerate(massive_indices):
+            if star_idx < len(frame):
+                p = frame[star_idx]
+            else:
+                final_pos = np.array(
+                    [
+                        final_frame[star_idx].x.value_in(units.AU),
+                        final_frame[star_idx].y.value_in(units.AU),
+                    ]
+                )
+                xs = np.array([p.x.value_in(units.AU) for p in frame])
+                ys = np.array([p.y.value_in(units.AU) for p in frame])
+                dists = np.hypot(xs - final_pos[0], ys - final_pos[1])
+                nearest_idx = int(np.argmin(dists))
+                p = frame[nearest_idx]
 
-    # --- Figure setup ---
-    fig, ax = plt.subplots(figsize=(8, 6))
+            tracked_positions[f_idx, idx_i, 0] = p.x.value_in(units.AU)
+            tracked_positions[f_idx, idx_i, 1] = p.y.value_in(units.AU)
 
-    sc = ax.scatter([], [], s=[])
-    time_text = ax.text(
-        0.02,
-        0.95,
-        "",
-        transform=ax.transAxes,
-        fontsize=12,
-        verticalalignment="top",
-        color="black",
-    )
+    # --- Gather all masses for color mapping ---
+    all_masses = np.array([p.mass.value_in(units.MSun) for f in frames for p in f])
+    cmap = plt.get_cmap("plasma")
+    norm = mcolors.Normalize(vmin=all_masses.min(), vmax=all_masses.max())
+    sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 
-    ax.set_xlabel("x [AU]", fontsize=12)
-    ax.set_ylabel("y [AU]", fontsize=12)
+    def mass_to_color(m):
+        return cmap(norm(m))
 
-    # Colorbar
-    cbar = plt.colorbar(sm, ax=ax, fraction=0.046, pad=0.04)
-    cbar.set_label("Mass [M$_\\odot$]", fontsize=12)
+    # --- Figure and subplots setup ---
+    fig, axes = plt.subplots(1, n_massive, figsize=(6 * n_massive, 6))
+    if n_massive == 1:
+        axes = [axes]
+
+    sc_list = []
+    time_text_list = []
+    for ax in axes:
+        sc = ax.scatter([], [], s=[])
+        sc_list.append(sc)
+        t_text = ax.text(
+            0.02,
+            0.95,
+            "",
+            transform=ax.transAxes,
+            fontsize=12,
+            verticalalignment="top",
+            color="black",
+        )
+        time_text_list.append(t_text)
+        ax.set_xlabel("x [AU]")
+        ax.set_ylabel("y [AU]")
+        ax.set_xlim(-100, 100)
+        ax.set_ylim(-100, 100)
+
+    # --- Add a shared colorbar ---
+    cbar = fig.colorbar(sm, ax=axes, orientation="vertical", fraction=0.05, pad=0.05)
+    cbar.set_label(r"Mass [M$_\odot$]", fontsize=12)
     cbar.ax.tick_params(labelsize=10)
 
     # --- Initialization ---
     def init():
-        sc.set_offsets(np.empty((0, 2)))
-        ax.set_xlim(-1200, 1200)
-        ax.set_ylim(-1200, 1200)
-        return sc, time_text
+        for sc, t_text in zip(sc_list, time_text_list):
+            sc.set_offsets(np.empty((0, 2)))
+            t_text.set_text("")
+        return sc_list + time_text_list
 
-    # --- Frame update ---
-    def update(frame_index):
-        frame = frames[frame_index]
-        x = np.array([p.x.value_in(units.AU) for p in frame])
-        y = np.array([p.y.value_in(units.AU) for p in frame])
-        masses = np.array([p.mass.value_in(units.MSun) for p in frame])
+    # --- Update function ---
+    def update(frame_idx):
+        frame = frames[frame_idx]
+        masses_frame = np.array([p.mass.value_in(units.MSun) for p in frame])
+        x_frame = np.array([p.x.value_in(units.AU) for p in frame])
+        y_frame = np.array([p.y.value_in(units.AU) for p in frame])
 
-        sizes = np.clip(masses * 2, 10, 500)
-        colors = [mass_to_color(m) for m in masses]
+        for ax_idx, star_idx in enumerate(massive_indices):
+            center = tracked_positions[frame_idx, ax_idx]
+            x_rel = x_frame - center[0]
+            y_rel = y_frame - center[1]
+            sizes = np.clip(masses_frame * 2, 10, 500)
+            colors = [mass_to_color(m) for m in masses_frame]
 
-        # Center all coordinates on tracked star
-        x_rel = x - tracked_positions[frame_index, 0]
-        y_rel = y - tracked_positions[frame_index, 1]
+            sc_list[ax_idx].set_offsets(np.c_[x_rel, y_rel])
+            sc_list[ax_idx].set_sizes(sizes)
+            sc_list[ax_idx].set_color(colors)
+            time_text_list[ax_idx].set_text(f"t = {frame_idx*0.1:.1f} yr")
 
-        sc.set_offsets(np.c_[x_rel, y_rel])
-        sc.set_sizes(sizes)
-        sc.set_color(colors)
+        return sc_list + time_text_list
 
-        ax.set_xlim(-100, 100)
-        ax.set_ylim(-100, 100)
-
-        dt = 0.1  # years per frame
-        t = frame_index * dt
-        time_text.set_text(f"t = {t:.0f} yr")
-
-        return sc, time_text
-
-    # --- Animation ---
     ani = FuncAnimation(
         fig,
         update,
@@ -139,16 +142,14 @@ def visualize_frames(frames, run_label="test"):
         repeat=False,
     )
 
-    gif_filename = os.path.join("Gif-6body", f"encounter_evolution_{run_label}.gif")
+    gif_filename = os.path.join(OUTPUT_DIR_GIF, f"encounter_evolution_{run_label}.gif")
     writer = PillowWriter(fps=10)
     ani.save(gif_filename, writer=writer)
-
-    print(f"🎬 GIF saved as {gif_filename}")
     plt.close(fig)
-    return
+    logger.info("GIF saved as %s", gif_filename)
 
 
-def visualize_initial_final_frames(frames, init_params, collision, label=""):
+def visualize_initial_final_frames(frames, run_label="test"):
     """
     Clean visualization of initial vs final simulation frames.
     Includes:
@@ -156,21 +157,15 @@ def visualize_initial_final_frames(frames, init_params, collision, label=""):
     - Final-frame trajectories of all surviving stars over all time
     - Robust handling of mergers (missing particles)
     """
-
-    import os
-    import numpy as np
-    import matplotlib.pyplot as plt
-    import matplotlib.colors as mcolors
-    from amuse.units import units
-
     # ---------------------------------------------------------
     # 0. Safety checks
     # ---------------------------------------------------------
     if len(frames) == 0:
-        print("⚠️ No frames provided.")
+        logger.warning("No frames provided to visualize_initial_final_frames.")
         return
 
-    os.makedirs("Gif-6body", exist_ok=True)
+    output_dir = OUTPUT_DIR_IMG
+    os.makedirs(output_dir, exist_ok=True)
 
     initial = frames[0]
     final = frames[-1]
@@ -369,6 +364,11 @@ def visualize_initial_final_frames(frames, init_params, collision, label=""):
     # ---------------------------------------------------------
     # 11. Final layout
     # ---------------------------------------------------------
-    plt.suptitle(f"Initial and Final Frames: {label}", fontsize=16)
+    plt.suptitle(f"Initial and Final Frames: {run_label}", fontsize=16)
 
-    plt.show()
+    png_filename = os.path.join(OUTPUT_DIR_IMG, f"encounter_evolution_{run_label}.png")
+    plt.savefig(png_filename)
+    logger.info("Comparison png saved as %s", png_filename)
+    plt.close(fig)
+
+    return None
