@@ -1,3 +1,7 @@
+"""
+Additional plotting utlities.
+"""
+
 import logging
 
 import corner
@@ -5,10 +9,6 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 logger = logging.getLogger(__name__)
-
-# -------------------------
-# Corner Plot
-# -------------------------
 
 
 def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
@@ -34,7 +34,6 @@ def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
 
     # ---- 2. Build matrix of parameters ----
     data = []
-    labels = []
 
     # build list of parameter names in stable order
     param_order = [
@@ -66,7 +65,7 @@ def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
     data = np.array(data)
 
     # ---- 3. Plot ----
-    fig = corner.corner(
+    corner.corner(
         data,
         labels=axis_labels,
         show_titles=True,
@@ -138,7 +137,7 @@ def plot_corner_marginalized(samples, results, outcome_name="creative_ionized", 
             axis_labels.append(f"{param}_{i}")
 
     # ---- 4. Plot weighted corner plot ----
-    fig = corner.corner(
+    corner.corner(
         data,
         labels=axis_labels,
         show_titles=True,

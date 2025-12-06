@@ -3,12 +3,11 @@ Main simulation functions for 6-body encounter simulation.
 Combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
 """
 
-# imports
 import os
 import time
 
 from amuse.community.ph4.interface import ph4
-from amuse.io import write_set_to_file  # , read_set_from_file
+from amuse.io import write_set_to_file
 from amuse.units import nbody_system, units
 
 from src.strw_amuse.collision import collision
@@ -27,8 +26,6 @@ from src.strw_amuse.helpers import (
     transformation_to_cartesian,
 )
 from src.strw_amuse.logging_config import setup_logging
-
-# from amuse.lab import *
 
 
 def run_6_body_simulation(
@@ -192,9 +189,9 @@ def run_6_body_simulation(
 
     if len(final_particles) == 0:
         logger.warning("No particles remaining in the system! Returning defaults.")
-        max_mass_particle = None
-        max_mass = 0 | units.MSun
-        max_velocity = 0 | units.kms
+        # max_mass_particle = None
+        # max_mass = 0 | units.MSun
+        # max_velocity = 0 | units.kms
         # Save final system
         final_filename = os.path.join(OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse")
         write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
@@ -217,9 +214,9 @@ def run_6_body_simulation(
 
             return frames, outcome
         else:
-            max_mass_particle = max(final_particles, key=lambda p: p.mass)
-            max_mass = max_mass_particle.mass
-            max_velocity = max_mass_particle.velocity.length()
+            # max_mass_particle = max(final_particles, key=lambda p: p.mass)
+            # max_mass = max_mass_particle.mass
+            # max_velocity = max_mass_particle.velocity.length()
 
             # Determine final outcome
 

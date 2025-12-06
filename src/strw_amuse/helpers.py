@@ -2,20 +2,17 @@
 General helper functions for AMUSE simulation.
 """
 
-# import
 import os
 
 import numpy as np
 from amuse.community.seba.interface import SeBa
 from amuse.datamodel import Particle, Particles
 from amuse.datamodel.particle_attributes import bound_subset
-from amuse.io import write_set_to_file  # , read_set_from_file
+from amuse.io import write_set_to_file
 from amuse.units import constants, units
 from amuse.units.quantities import VectorQuantity
 
 from src.strw_amuse.config import OUTPUT_DIR_COLLISIONS_OUTCOMES
-
-# func repo
 
 
 def make_triple_binary_system(
@@ -324,9 +321,9 @@ def outcomes(
         os.makedirs(output_dir, exist_ok=True)
 
     if isinstance(final_particles, list):
-        final_particles = Particles(
-            final_particles
-        )  # <<-ERROR type list[Unkonwn] cannot be assigned to param size of type int in function __init__
+        final_particles = Particles(final_particles)
+        # <<-ERROR
+        # type list[Unkonwn] cannot be assigned to param size of type int in function __init__
 
     # Build mapping: final star key -> number of collisions
     collisions_per_star = {p.key: 0 for p in final_particles}

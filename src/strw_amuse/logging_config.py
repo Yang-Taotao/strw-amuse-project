@@ -4,7 +4,6 @@ Logger utilities.
 - Optional per-rank file handler (MPI-aware if `mpi4py` is present).
 """
 
-# imports
 import logging
 import os
 from logging.handlers import RotatingFileHandler
@@ -17,8 +16,6 @@ try:
     from mpi4py import MPI  # type: ignore
 except ImportError:  # pragma: no cover - mpi4py may not be installed in tests
     MPI = None
-
-# func repo
 
 
 def _get_mpi_rank():

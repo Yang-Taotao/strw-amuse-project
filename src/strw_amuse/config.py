@@ -4,7 +4,6 @@ Configuation file for the STRW-AMUSE project.
 - Contain file directory settings.
 """
 
-# imports
 import numpy as np
 
 # configs - dir

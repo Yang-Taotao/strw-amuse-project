@@ -3,8 +3,6 @@ Plotting utilities for AMUSE simulation.
 """
 
 import logging
-
-# import
 import os
 
 import matplotlib.colors as mcolors
@@ -18,7 +16,6 @@ from src.strw_amuse.config import OUTPUT_DIR_GIF, OUTPUT_DIR_IMG
 logger = logging.getLogger(__name__)
 
 
-# func repo
 def visualize_frames(frames, run_label="test", massive_threshold=70.0):
     """
     Visualize AMUSE simulation frames and produce a GIF.
@@ -104,7 +101,7 @@ def visualize_frames(frames, run_label="test", massive_threshold=70.0):
 
     # --- Add a shared colorbar ---
     cbar = fig.colorbar(sm, ax=axes, orientation="vertical", fraction=0.05, pad=0.05)
-    cbar.set_label("Mass [M$_\odot$]", fontsize=12)
+    cbar.set_label(r"Mass [M$_\odot$]", fontsize=12)
     cbar.ax.tick_params(labelsize=10)
 
     # --- Initialization ---

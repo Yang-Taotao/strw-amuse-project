@@ -1,4 +1,7 @@
-# Imports
+"""
+Monte Carlo simulation utilities for cross section calculation.
+"""
+
 from dataclasses import dataclass
 from multiprocessing import Pool, cpu_count
 
@@ -8,9 +11,6 @@ from tqdm import tqdm
 from src.strw_amuse.run_simulation import run_6_body_simulation
 
 
-# -------------------------
-# Sampling initial conditions
-# -------------------------
 def sample_19D_lhs(n_samples, rng=None):
     """
     Generate stratified Latin Hypercube samples in the fixed 19D parameter space
@@ -72,9 +72,6 @@ def sample_19D_lhs(n_samples, rng=None):
     return samples, param_names, distances, weights
 
 
-# -------------------------
-# Single Simulation
-# -------------------------
 def _run_single_simulation(args):
     """
     Runs a single simulation given array slices.
@@ -114,13 +111,8 @@ def _run_single_simulation(args):
 
         return outcome, w
 
-    except Exception as e:
+    except Exception:
         return "simulation_failed", w
-
-
-# -------------------------
-# Monte Carlo Simulations
-# -------------------------
 
 
 @dataclass

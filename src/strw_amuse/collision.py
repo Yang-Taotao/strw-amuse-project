@@ -3,8 +3,6 @@ General helper functions for AMUSE simulation.
 """
 
 import logging
-
-# import
 import os
 
 import numpy as np
@@ -20,8 +18,6 @@ from src.strw_amuse.config import (
 )
 
 logger = logging.getLogger(__name__)
-
-# func repo
 
 
 def create_sph_star(mass, radius, n_particles=10000, u_value=None, pos_unit=units.AU):
@@ -225,8 +221,8 @@ def run_fi_collision(gas, t_end=0.1 | units.yr, min_mass=1e-6 | units.MSun, run_
     L_vec = np.sum(m[:, None] * np.cross(r, v), axis=0) | (units.kg * units.m**2 / units.s)
 
     r_rel = bound_particles.position - bound_particles.center_of_mass()
-    I = (bound_particles.mass * r_rel.lengths() ** 2).sum()
-    omega = (L_vec.length() / I).in_(1 / units.s)
+    I_cm = (bound_particles.mass * r_rel.lengths() ** 2).sum()
+    omega = (L_vec.length() / I_cm).in_(1 / units.s)
 
     # --- Write diagnostics ---
     diag_particle = Particle()
