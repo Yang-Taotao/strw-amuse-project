@@ -10,7 +10,7 @@ from amuse.datamodel.particle_attributes import bound_subset
 from amuse.io import write_set_to_file
 from amuse.units import constants, units
 
-from src.strw_amuse.config import OUTPUT_DIR_COLLISIONS_OUTCOMES
+from .utils.config import OUTPUT_DIR_COLLISIONS_OUTCOMES
 
 
 def specific_pair_energy(p_i, p_j):

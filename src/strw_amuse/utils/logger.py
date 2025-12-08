@@ -8,7 +8,7 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-from src.strw_amuse.config import OUTPUT_DIR_LOGS
+from .config import OUTPUT_DIR_LOGS
 
 # Import `mpi4py` if possible. ImportError is expected
 # If mpi4py is not installed; use `MPI=None` to run without mpi support.

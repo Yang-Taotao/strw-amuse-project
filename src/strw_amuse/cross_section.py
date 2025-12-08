@@ -8,7 +8,7 @@ from multiprocessing import Pool, cpu_count
 import numpy as np
 from tqdm import tqdm
 
-from src.strw_amuse.run_simulation import run_6_body_simulation
+from .run_simulation import run_6_body_simulation
 
 
 def sample_19D_lhs(n_samples, rng=None):

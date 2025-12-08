@@ -12,7 +12,7 @@ from amuse.datamodel.particle_attributes import bound_subset
 from amuse.io import write_set_to_file  # , read_set_from_file
 from amuse.units import constants, nbody_system, units
 
-from src.strw_amuse.config import (
+from .utils.config import (
     OUTPUT_DIR_COLLISIONS,
     OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
 )

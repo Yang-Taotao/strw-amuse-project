@@ -12,7 +12,7 @@ import numpy as np
 from amuse.units import units
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-from src.strw_amuse.config import OUTPUT_DIR_GIF, OUTPUT_DIR_IMG
+from .utils.config import OUTPUT_DIR_GIF, OUTPUT_DIR_IMG
 
 logger = logging.getLogger(__name__)
 
