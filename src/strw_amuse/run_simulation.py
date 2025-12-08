@@ -3,6 +3,7 @@ Main simulation functions for 6-body encounter simulation.
 Combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
 """
 
+import logging
 import os
 import time
 
@@ -24,7 +25,6 @@ from src.strw_amuse.helpers import (
     make_triple_binary_system,
     transformation_to_cartesian,
 )
-from src.strw_amuse.logging_config import setup_logging
 from src.strw_amuse.stopping import (
     find_bound_groups,
     group_com,
@@ -33,6 +33,8 @@ from src.strw_amuse.stopping import (
     outcomes,
     specific_pair_energy,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def run_6_body_simulation(
@@ -72,8 +74,6 @@ def run_6_body_simulation(
         if not os.path.exists(d):
             os.makedirs(d, exist_ok=True)
 
-    # initialize logging (MPI-aware)
-    logger = setup_logging(log_dir=OUTPUT_DIR_LOGS)
     logger.info("Logging initialized for simulation: %s", run_label)
 
     # Set units
