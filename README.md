@@ -12,8 +12,9 @@ This is the README document for strw-amuse-project, a project for the 2025 [***S
   - [Usage and Notes](#usage-and-notes)
   - [Goals](#goals)
     - [Idea](#idea)
-    - [Example I/O](#example-io)
-    - [Pipeline](#pipeline)
+    - [Assumptions](#assumptions)
+    - [Some interesting questions](#some-interesting-questions)
+  - [Example](#example)
   - [Grading rubric](#grading-rubric)
   - [Archived](#archived)
     - [Steps](#steps)
@@ -34,61 +35,43 @@ We list the collaborators in alphabetical order.
 
 ![Linux](https://img.shields.io/badge/-Linux-grey?logo=linux)
 
-- Run scripts from [`main.py`](./main.py)
-- Check [`Documentation`](./docs/AMUSE_Install_v2025.9.0.md) for AMUSE installation setup and example script for simulations.
-- AMUSE [`v2025.9.0`](https://github.com/amusecode/amuse/releases/tag/v2025.9.0) required for current project.
-- Conda [`env`](./environment.yml) recommended. Replicate with provided file.
+- Run project with [`main.py`](./main.py)
+- Check [`Documentation`](./docs/)(./docs/AMUSE_Install_v2025.9.0.md) for `AMUSE` installation setup and example script for `AMUSE` simulations.
+- Require `AMUSE` [`v2025.9.0`](https://github.com/amusecode/amuse/releases/tag/v2025.9.0) for current project.
+- See [`environment.yml`](./environment.yml) for `Conda` environment.
 - See [`pyproject.toml`](./pyproject.toml) for `Black` config.
 - See [`setup.cfg`](./setup.cfg) for `isort` and `flake8` config.
 
 ## Goals
 
-Generate probability estimation of pistol star formation based off of some configurations of star system interactions in a cluster.
+Generate probability estimation of pistol star formation based off of some configurations of star system interactions inside a cluster.
 
 ### Idea
 
-A rough outline follows:
+- Shoot a triplet or binary at some host triplet or binary-binary system.
+- Use host triplet/quintuplet system as point of reference.
+- Get probability of these trails ejecting pistol star.
+  
+### Assumptions
 
-- General: shoot a triplet or binary at some host triplet and binary-binary system
-- Localized space environment
-- Fixed host triplet/quintuplet system <- shoot some bin/triplet at the host from all points on a sphere
-- How many of these trails have pistol ejected -> probability
-- More likely to form in bin-bin-bin or tri-tri configuration
-- Assume close encounter event of bin-bin-bin or tri-tri has happened in some cluster
-- Distant effect of other stars in the cluster -> trivial
+- Close encounter event of bin-bin-bin or tri-tri has happened in some cluster.
+- Interaction take place in localized spatial environment
+- Distant effect of other stars in the cluster is trivial.
 
-### Example I/O
+### Some interesting questions
 
-> I/O
->
-> Input:
->
-> - host_system_param(triplet or bin-bin) <- mass, velocity, location, separation, etc
-> - variable_system_param(triplet or bin) <- mass, velocity, location, separation, etc
->
-> Output:\
->
-> - ejection_flag(True or False)
-> - ejected_param(mass, velocity)
->
+- Is it more likely to form in bin-bin-bin or tri-tri configuration?
 
-### Pipeline
+## Example
 
-> I/O
->
-> 1. Set CONFIG file or entries -> config.py
-> 2. Build parameter_array enteries based off of CONFIG -> param = param_build(config)
-> 3. Run simulation with parameter_array -> sim_results = run_sim(param)
-> 4. Visualization and probability estimation -> output = visualization(sim_results)
->
-
-Ideally, we should be able to call and use the package as follows:
+Use the following example script as provided in [`main.py`](main.py) as an example on how to run one simulation run of this project.
 
 ```py
-# import
-from project_name import config, magic
-# generate results
-magic(config)
+import src.strw_amuse as project
+
+project.utils.logger.setup_logging()
+project.utils.checker.check_sim_example()
+
 ```
 
 ## Grading rubric
