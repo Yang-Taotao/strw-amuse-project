@@ -70,55 +70,6 @@ def create_sph_star(mass, radius, n_particles=10000, u_value=None, pos_unit=unit
     return sph
 
 
-def create_sph_star_bak(mass, radius, n_particles=10000, u_value=None, pos_unit=units.AU):
-    """
-    Create a uniform-density SPH star with safer defaults.
-    mass, radius: AMUSE quantities
-    pos_unit: coordinate unit for output positions
-    """
-    sph = Particles(n_particles)
-
-    # set per-particle mass (AMUSE broadcasts quantity)
-    sph.mass = mass / n_particles
-
-    # sample radius uniformly in volume (keep units)
-    # convert radius to meters for numpy sampling then reattach unit
-    r_vals = (radius.value_in(units.m) * np.random.random(n_particles) ** (1 / 3)) | units.m
-    theta = np.arccos(2.0 * np.random.random(n_particles) - 1.0)
-    phi = 2.0 * np.pi * np.random.random(n_particles)
-
-    x = r_vals * np.sin(theta) * np.cos(phi)
-    y = r_vals * np.sin(theta) * np.sin(phi)
-    z = r_vals * np.cos(theta)
-
-    # attach coordinates in requested unit
-    sph.x = x.in_(pos_unit)
-    sph.y = y.in_(pos_unit)
-    sph.z = z.in_(pos_unit)
-
-    # velocities zero in star frame
-    sph.vx = 0.0 | units.kms
-    sph.vy = 0.0 | units.kms
-    sph.vz = 0.0 | units.kms
-
-    # internal energy estimate
-    if u_value is None:
-        # virial-ish estimate: u ~ 0.2 * G M / R  (units J/kg)
-        u_est = 0.2 * (constants.G * mass / radius)
-        sph.u = u_est
-    else:
-        sph.u = u_value
-
-    # compute a mean inter-particle spacing in meters and set h_smooth to a safe fraction
-    mean_sep = ((4 / 3.0) * np.pi * (radius.value_in(units.m) ** 3) / n_particles) ** (
-        1 / 3
-    ) | units.m
-    # choose smoothing length ~ 1.2 * mean_sep (safe number of neighbors)
-    sph.h_smooth = (1.2 * mean_sep).in_(pos_unit)
-
-    return sph
-
-
 def make_sph_from_two_stars(stars, n_sph_per_star=100, u_value=None, pos_unit=units.AU):
     if len(stars) != 2:
         raise ValueError("Expect exactly two stars")

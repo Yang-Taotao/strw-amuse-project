@@ -7,7 +7,7 @@ import os
 
 from amuse.datamodel import Particle, Particles
 from amuse.datamodel.particle_attributes import bound_subset
-from amuse.io import write_set_to_file  # , read_set_from_file
+from amuse.io import write_set_to_file
 from amuse.units import constants, units
 
 from src.strw_amuse.config import OUTPUT_DIR_COLLISIONS_OUTCOMES

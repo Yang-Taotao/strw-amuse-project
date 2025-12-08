@@ -47,7 +47,7 @@ def run_6_body_simulation(
     true_anomalies,
     run_label,
     masses=None,
-    centers=None,  # <-- impact orientation angles
+    centers=None,
     age=3.5,
 ):
     """
