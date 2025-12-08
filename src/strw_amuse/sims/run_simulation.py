@@ -11,27 +11,27 @@ from amuse.community.ph4.interface import ph4
 from amuse.io import write_set_to_file
 from amuse.units import nbody_system, units
 
-from .collision import collision
-from .utils.config import (
-    OUTPUT_DIR_COLLISIONS,
-    OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
-    OUTPUT_DIR_FINAL_STATES,
-    OUTPUT_DIR_LOGS,
-    OUTPUT_DIR_OUTCOMES,
-    OUTPUT_DIR_SNAPSHOTS,
-)
-from .helpers import (
+from ..core.collision import collision
+from ..core.helpers import (
     make_seba_stars,
     make_triple_binary_system,
     transformation_to_cartesian,
 )
-from .stopping import (
+from ..core.stopping import (
     find_bound_groups,
     group_com,
     group_physical_size,
     is_ionized_single,
     outcomes,
     specific_pair_energy,
+)
+from ..utils.config import (
+    OUTPUT_DIR_COLLISIONS,
+    OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
+    OUTPUT_DIR_FINAL_STATES,
+    OUTPUT_DIR_LOGS,
+    OUTPUT_DIR_OUTCOMES,
+    OUTPUT_DIR_SNAPSHOTS,
 )
 
 logger = logging.getLogger(__name__)

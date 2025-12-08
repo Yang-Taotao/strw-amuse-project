@@ -2,9 +2,9 @@
 Example run checker for `run_6body_simulation()`.
 """
 
+from ..plots.plotter import plot_gif, plot_trajectory
+from ..sims.run_simulation import run_6_body_simulation
 from .config import PARAM_REF, PARAM_TEST
-from ..plotter import plot_gif, plot_trajectory
-from ..run_simulation import run_6_body_simulation
 
 
 def check_sim_example(param_a: tuple = PARAM_REF, param_b: tuple = PARAM_TEST):
