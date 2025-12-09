@@ -129,3 +129,18 @@ It is also great to just install everything amuse has to offer with:
 ```bash
 > ./setup install all
 ```
+
+## AMUSE environment
+
+We can replicate our `AMUSE` environment with `Conda`, input the following in terminal, where you can also overwrite the created `env` as `myenv`.
+
+```bash
+conda env create -f environment.yml -n myenv
+```
+
+## Collaboration
+
+General process applies:
+
+- Submit `issues` for potential feature or bugfix
+- Fork and submit PR for associated feature branch on GitHub
