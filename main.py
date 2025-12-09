@@ -2,8 +2,8 @@
 Main script for running the 6-body encounter simulation and visualization.
 """
 
-import src.strw_amuse as project
+from src.strw_amuse.utils import logger, checker
 
 if __name__ in ("__main__"):
-    project.utils.logger.setup_logging()
-    project.utils.checker.check_sim_example()
+    logger.setup_logging()
+    checker.check_sim_example()
