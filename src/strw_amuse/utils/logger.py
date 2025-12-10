@@ -8,7 +8,7 @@ import logging
 import os
 from logging.handlers import RotatingFileHandler
 
-from src.strw_amuse.config import OUTPUT_DIR_LOGS
+from .config import OUTPUT_DIR_LOGS
 
 # Import `mpi4py` if possible. ImportError is expected
 # If mpi4py is not installed; use `MPI=None` to run without mpi support.
@@ -40,7 +40,7 @@ def _get_mpi_rank():
         return None
 
 
-def setup_logging(rank=None, log_dir=OUTPUT_DIR_LOGS, level=logging.INFO, name="strw_amuse"):
+def setup_logging(rank=None, log_dir=OUTPUT_DIR_LOGS, level=logging.INFO, name="src.strw_amuse"):
     """
     Configure logging for the package.
 
@@ -51,7 +51,7 @@ def setup_logging(rank=None, log_dir=OUTPUT_DIR_LOGS, level=logging.INFO, name="
     log_dir: str
         Directory where per-rank log files will be written if rank is not None.
     level: logging level
-    name: logger name
+    name: logger name (default `src.strw_amuse` to match package module names)
     """
     if rank is None:
         rank = _get_mpi_rank()

@@ -5,18 +5,19 @@ Plotting utilities for AMUSE simulation.
 import logging
 import os
 
+import corner
 import matplotlib.colors as mcolors
 import matplotlib.pyplot as plt
 import numpy as np
 from amuse.units import units
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-from src.strw_amuse.config import OUTPUT_DIR_GIF, OUTPUT_DIR_IMG
+from ..utils.config import OUTPUT_DIR_GIF, OUTPUT_DIR_IMG
 
 logger = logging.getLogger(__name__)
 
 
-def visualize_frames(frames, run_label="test", massive_threshold=70.0):
+def plot_gif(frames, run_label="test", massive_threshold=70.0):
     """
     Visualize AMUSE simulation frames and produce a GIF.
 
@@ -28,7 +29,7 @@ def visualize_frames(frames, run_label="test", massive_threshold=70.0):
     """
 
     if len(frames) == 0:
-        logger.warning("No frames provided to visualize_frames.")
+        logger.warning("No frames provided to `plot_gif()`.")
         return None
 
     output_dir = OUTPUT_DIR_GIF
@@ -149,29 +150,22 @@ def visualize_frames(frames, run_label="test", massive_threshold=70.0):
     logger.info("GIF saved as %s", gif_filename)
 
 
-def visualize_initial_final_frames(frames, run_label="test"):
+def plot_trajectory(frames, run_label="test"):
     """
-    Clean visualization of initial vs final simulation frames.
-    Includes:
-    - Initial binary orbital arcs (first 40 frames)
-    - Final-frame trajectories of all surviving stars over all time
-    - Robust handling of mergers (missing particles)
+    Spaghetti plot of final frame stars and their trajectories over time.
+    Centers on the most massive star in the final frame.
     """
-    # ---------------------------------------------------------
-    # 0. Safety checks
-    # ---------------------------------------------------------
     if len(frames) == 0:
-        logger.warning("No frames provided to visualize_initial_final_frames.")
+        logger.warning("No frames provided for `plot_trajectory()`.")
         return
 
     output_dir = OUTPUT_DIR_IMG
     os.makedirs(output_dir, exist_ok=True)
 
-    initial = frames[0]
     final = frames[-1]
 
     # ---------------------------------------------------------
-    # 1. Build colormap for masses
+    # Build colormap for masses
     # ---------------------------------------------------------
     all_masses = np.array([p.mass.value_in(units.MSun) for f in frames for p in f])
     cmap = plt.get_cmap("plasma")
@@ -182,7 +176,7 @@ def visualize_initial_final_frames(frames, run_label="test"):
         return cmap(norm(m))
 
     # ---------------------------------------------------------
-    # 2. Track most massive star for final centering
+    # Track most massive star for centering
     # ---------------------------------------------------------
     masses_final = np.array([p.mass.value_in(units.MSun) for p in final])
     idx_track = np.argmax(masses_final)
@@ -197,149 +191,38 @@ def visualize_initial_final_frames(frames, run_label="test"):
             for fr in frames
         ]
     )
-
     cx_final, cy_final = track_pos[-1]
 
     # ---------------------------------------------------------
-    # 3. Prepare figure
+    # Prepare figure
     # ---------------------------------------------------------
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6), dpi=120)
-
-    for ax in (ax1, ax2):
-        ax.set_xlabel("x [AU]")
-        ax.set_ylabel("y [AU]")
-
-    ax1.set_title("Initial Configuration")
-    ax2.set_title("Final Configuration")
-    plt.colorbar(sm, ax=[ax1, ax2], label="Mass [M$_\\odot$]")
+    fig, ax = plt.subplots(figsize=(8, 8), dpi=120)
+    ax.set_xlabel("x [AU]")
+    ax.set_ylabel("y [AU]")
+    ax.set_title(f"Spaghetti plots: {run_label}")
+    plt.colorbar(sm, ax=ax, label="Mass [M$_\\odot$]")
 
     # ---------------------------------------------------------
-    # 4. Helper to scatter stars
+    # Helper to scatter stars
     # ---------------------------------------------------------
     def scatter_stars(ax, frame, center=(0, 0)):
         x = np.array([p.x.value_in(units.AU) for p in frame]) - center[0]
         y = np.array([p.y.value_in(units.AU) for p in frame]) - center[1]
         m = np.array([p.mass.value_in(units.MSun) for p in frame])
-
         sizes = np.clip(m * 3, 8, 500)
         colors = [mass_color(mi) for mi in m]
-
         ax.scatter(x, y, s=sizes, c=colors)
         return x, y
 
     # ---------------------------------------------------------
-    # 5. Initial frame: center on COM
+    # Scatter final positions
     # ---------------------------------------------------------
-    mi = np.array([p.mass.value_in(units.MSun) for p in initial])
-    xi = np.array([p.x.value_in(units.AU) for p in initial])
-    yi = np.array([p.y.value_in(units.AU) for p in initial])
-
-    com_x = np.sum(mi * xi) / np.sum(mi)
-    com_y = np.sum(mi * yi) / np.sum(mi)
-
-    xi_rel, yi_rel = scatter_stars(ax1, initial, center=(com_x, com_y))
+    x_rel, y_rel = scatter_stars(ax, final, center=(cx_final, cy_final))
 
     # ---------------------------------------------------------
-    # 6. Plot initial velocities
-    # ---------------------------------------------------------
-    if hasattr(initial[0], "vx"):
-        vx = np.array([p.vx.value_in(units.AU / units.yr) for p in initial])
-        vy = np.array([p.vy.value_in(units.AU / units.yr) for p in initial])
-        ax1.quiver(
-            xi_rel,
-            yi_rel,
-            vx,
-            vy,
-            angles="xy",
-            scale_units="xy",
-            scale=1.5,
-            color="gray",
-            alpha=0.6,
-            width=0.004,
-        )
-
-    # ---------------------------------------------------------
-    # 7. Initial internal binary orbital arcs (first 40 frames)
-    # ---------------------------------------------------------
-    binary_groups = [(0, 1), (2, 3), (4, 5)]
-    orbit_colors = ["red", "blue", "green"]
-
-    n_traj = min(40, len(frames))
-
-    for bidx, (i, j) in enumerate(binary_groups):
-
-        # Skip missing binaries (due to mergers)
-        if i >= len(initial) or j >= len(initial):
-            continue
-
-        # initial static positions (for anchoring arcs)
-        xi0 = initial[i].x.value_in(units.AU)
-        yi0 = initial[i].y.value_in(units.AU)
-        xj0 = initial[j].x.value_in(units.AU)
-        yj0 = initial[j].y.value_in(units.AU)
-
-        traj_i = []
-        traj_j = []
-
-        for k in range(n_traj):
-            fr = frames[k]
-            if i >= len(fr) or j >= len(fr):
-                break
-
-            xi_k = fr[i].x.value_in(units.AU)
-            yi_k = fr[i].y.value_in(units.AU)
-            xj_k = fr[j].x.value_in(units.AU)
-            yj_k = fr[j].y.value_in(units.AU)
-
-            mi_k = fr[i].mass.value_in(units.MSun)
-            mj_k = fr[j].mass.value_in(units.MSun)
-
-            # binary COM
-            bcx = (mi_k * xi_k + mj_k * xj_k) / (mi_k + mj_k)
-            bcy = (mi_k * yi_k + mj_k * yj_k) / (mi_k + mj_k)
-
-            # relative orbital motion + anchor to initial COM-center frame
-            traj_i.append([xi_k - bcx + (xi0 - com_x), yi_k - bcy + (yi0 - com_y)])
-
-            traj_j.append([xj_k - bcx + (xj0 - com_x), yj_k - bcy + (yj0 - com_y)])
-
-        traj_i = np.array(traj_i)
-        traj_j = np.array(traj_j)
-
-        if len(traj_i) > 1:
-            ax1.plot(traj_i[:, 0], traj_i[:, 1], color=orbit_colors[bidx], alpha=0.7)
-        if len(traj_j) > 1:
-            ax1.plot(traj_j[:, 0], traj_j[:, 1], color=orbit_colors[bidx], alpha=0.7)
-
-    # ---------------------------------------------------------
-    # 8. Final frame scatter centered on tracked star
-    # ---------------------------------------------------------
-    x2_rel, y2_rel = scatter_stars(ax2, final, center=(cx_final, cy_final))
-
-    # ---------------------------------------------------------
-    # 9. Final velocities
-    # ---------------------------------------------------------
-    if hasattr(final[0], "vx"):
-        vx = np.array([p.vx.value_in(units.AU / units.yr) for p in final])
-        vy = np.array([p.vy.value_in(units.AU / units.yr) for p in final])
-        ax2.quiver(
-            x2_rel,
-            y2_rel,
-            vx * 40,
-            vy * 40,
-            angles="xy",
-            scale_units="xy",
-            scale=1.4,
-            color="gray",
-            alpha=0.6,
-            width=0.004,
-        )
-
-    # ---------------------------------------------------------
-    # 10. Full trajectories for surviving stars (centered on tracked star)
+    # Plot full trajectories
     # ---------------------------------------------------------
     for idx_final in range(len(final)):
-
         traj_x = []
         traj_y = []
 
@@ -353,22 +236,156 @@ def visualize_initial_final_frames(frames, run_label="test"):
         traj_y = np.array(traj_y)
 
         if len(traj_x) > 1:
-            ax2.plot(traj_x, traj_y, alpha=0.6)
+            ax.plot(traj_x, traj_y, alpha=0.6)
 
     # Adaptive limits
-    dx = max(50, (x2_rel.max() - x2_rel.min()) * 1.3)
-    dy = max(50, (y2_rel.max() - y2_rel.min()) * 1.3)
-    ax2.set_xlim(-dx, dx)
-    ax2.set_ylim(-dy, dy)
+    dx = max(50, (x_rel.max() - x_rel.min()) * 1.3)
+    dy = max(50, (y_rel.max() - y_rel.min()) * 1.3)
+    ax.set_xlim(-dx, dx)
+    ax.set_ylim(-dy, dy)
 
     # ---------------------------------------------------------
-    # 11. Final layout
+    # Save figure
     # ---------------------------------------------------------
-    plt.suptitle(f"Initial and Final Frames: {run_label}", fontsize=16)
-
-    png_filename = os.path.join(OUTPUT_DIR_IMG, f"encounter_evolution_{run_label}.png")
+    png_filename = os.path.join(output_dir, f"Spaghetti_plot_{run_label}.png")
     plt.savefig(png_filename)
-    logger.info("Comparison png saved as %s", png_filename)
+    logger.info("Spaghetti plot saved as %s", png_filename)
     plt.close(fig)
 
-    return None
+
+def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
+    """
+    Generate a corner plot for all samples that produced the given outcome_name.
+
+    Parameters
+    ----------
+    samples : list of dicts
+        Output of sample_19D_lhs()
+    results : list of (label, weight)
+        Output collected from the parallel pool
+    outcome_name : str
+        Outcome category to filter (e.g., "creative_ionized")
+    """
+
+    # ---- 1. Collect matching sample indices ----
+    indices = [i for i, (label, _) in enumerate(results) if label == outcome_name]
+
+    if len(indices) == 0:
+        logger.warning("No samples with outcome '%s'. Cannot make corner plot.", outcome_name)
+        return
+
+    # ---- 2. Build matrix of parameters ----
+    data = []
+
+    # build list of parameter names in stable order
+    param_order = [
+        "ecc",
+        "sep",
+        "v_mag",
+        "impact_parameter",
+        "theta",
+        "phi",
+        "psi",
+        "true_anomalies",
+    ]
+    # count lengths = 3, 3, 2, 2, 2, 2, 2, 3
+
+    # Construct readable axis labels
+    axis_labels = []
+    for k in param_order:
+        for i in range(len(samples[0][k])):
+            axis_labels.append(f"{k}_{i}")
+
+    # Fill matrix
+    for idx in indices:
+        s = samples[idx]
+        row = []
+        for k in param_order:
+            row.extend(list(s[k]))
+        data.append(row)
+
+    data = np.array(data)
+
+    # ---- 3. Plot ----
+    corner.corner(
+        data,
+        labels=axis_labels,
+        show_titles=True,
+        title_fmt=".2f",
+        quantiles=[0.16, 0.5, 0.84],
+        bins=25,
+    )
+
+    plt.show()
+
+
+def plot_corner_marginalized(samples, results, outcome_name="creative_ionized", param_subset=None):
+    """
+    Generate a corner plot for a subset of parameters, marginalizing over the others.
+
+    Parameters
+    ----------
+    samples : list of dicts
+        Output of sample_19D_lhs() (old format)
+    results : list of (label, weight)
+        Full simulation outcomes and weights
+    outcome_name : str
+        Outcome category to filter (e.g., "creative_ionized")
+    param_subset : list of str
+        List of parameter names to include in the plot (e.g., ["ecc", "sep", "v_mag"])
+        If None, all parameters are included.
+    """
+    # ---- 1. Collect matching sample indices ----
+    indices = [i for i, (label, _) in enumerate(results) if label == outcome_name]
+
+    if len(indices) == 0:
+        logger.warning("No samples with outcome '%s'. Cannot make corner plot.", outcome_name)
+        return
+
+    # Default to all parameters
+    if param_subset is None:
+        param_subset = [
+            "ecc",
+            "sep",
+            "v_mag",
+            "impact_parameter",
+            "theta",
+            "phi",
+            "psi",
+            "true_anomalies",
+        ]
+
+    # ---- 2. Build matrix of parameters ----
+    data = []
+    weights = []
+
+    for idx in indices:
+        s = samples[idx]
+        w = results[idx][1]  # weight
+        row = []
+        for param in param_subset:
+            row.extend(s[param])
+        data.append(row)
+        weights.append(w)
+
+    data = np.array(data)
+    weights = np.array(weights)
+
+    # ---- 3. Build axis labels ----
+    axis_labels = []
+    for param in param_subset:
+        n = len(samples[0][param])
+        for i in range(n):
+            axis_labels.append(f"{param}_{i}")
+
+    # ---- 4. Plot weighted corner plot ----
+    corner.corner(
+        data,
+        labels=axis_labels,
+        show_titles=True,
+        title_fmt=".2f",
+        bins=25,
+        weights=weights,
+    )
+
+    plt.show()

@@ -26,7 +26,7 @@ PARAM_REF = (
     # sep_ref | AU
     [30, 20, 10],
     # ecc_ref
-    [0.0, 0.0, 0],
+    [0.0, 0.0, 0.0],
     # v_mag_ref
     [2, 1],
     # impact_parameter_ref | AU
@@ -49,7 +49,7 @@ PARAM_TEST = (
     # sep_ref | AU
     [30, 20, 10],
     # ecc_ref
-    [0.0, 0.0, 0],
+    [0.0, 0.0, 0.0],
     # v_mag_ref
     [0.2, 0.2],
     # impact_parameter_ref | AU

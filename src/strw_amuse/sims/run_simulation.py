@@ -3,6 +3,7 @@ Main simulation functions for 6-body encounter simulation.
 Combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
 """
 
+import logging
 import os
 import time
 
@@ -10,22 +11,13 @@ from amuse.community.ph4.interface import ph4
 from amuse.io import write_set_to_file
 from amuse.units import nbody_system, units
 
-from src.strw_amuse.collision import collision
-from src.strw_amuse.config import (
-    OUTPUT_DIR_COLLISIONS,
-    OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
-    OUTPUT_DIR_FINAL_STATES,
-    OUTPUT_DIR_LOGS,
-    OUTPUT_DIR_OUTCOMES,
-    OUTPUT_DIR_SNAPSHOTS,
-)
-from src.strw_amuse.helpers import (
+from ..core.collision import collision
+from ..core.helpers import (
     make_seba_stars,
     make_triple_binary_system,
     transformation_to_cartesian,
 )
-from src.strw_amuse.logging_config import setup_logging
-from src.strw_amuse.stopping import (
+from ..core.stopping import (
     find_bound_groups,
     group_com,
     group_physical_size,
@@ -33,6 +25,16 @@ from src.strw_amuse.stopping import (
     outcomes,
     specific_pair_energy,
 )
+from ..utils.config import (
+    OUTPUT_DIR_COLLISIONS,
+    OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
+    OUTPUT_DIR_FINAL_STATES,
+    OUTPUT_DIR_LOGS,
+    OUTPUT_DIR_OUTCOMES,
+    OUTPUT_DIR_SNAPSHOTS,
+)
+
+logger = logging.getLogger(__name__)
 
 
 def run_6_body_simulation(
@@ -47,7 +49,7 @@ def run_6_body_simulation(
     true_anomalies,
     run_label,
     masses=None,
-    centers=None,  # <-- impact orientation angles
+    centers=None,
     age=3.5,
 ):
     """
@@ -72,8 +74,6 @@ def run_6_body_simulation(
         if not os.path.exists(d):
             os.makedirs(d, exist_ok=True)
 
-    # initialize logging (MPI-aware)
-    logger = setup_logging(log_dir=OUTPUT_DIR_LOGS)
     logger.info("Logging initialized for simulation: %s", run_label)
 
     # Set units
