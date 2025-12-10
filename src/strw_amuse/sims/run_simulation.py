@@ -74,7 +74,7 @@ def run_6_body_simulation(
         if not os.path.exists(d):
             os.makedirs(d, exist_ok=True)
 
-    logger.info("Logging initialized for simulation: %s", run_label)
+    logger.info("SIM: run_6body: Logging initialized for simulation: %s", run_label)
 
     # Set units
     target_age = age | units.Myr
@@ -89,9 +89,11 @@ def run_6_body_simulation(
     # default masses (avoid mutable default argument)
     if masses is None:
         masses = [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
+        logger.info("SIM: run_6body: VAR: `masses` is `None`, default `masses` assigned.")
     # Default psi if not provided
     if psi is None:
         psi = [0.0, 0.0, 0.0]
+        logger.info("SIM: run_6body: VAR: `psi` is `None`, default `psi` assigned.")
 
     centers, v_vectors, directions, orbit_plane, phases = transformation_to_cartesian(
         sep=sep,
@@ -102,11 +104,13 @@ def run_6_body_simulation(
         v_mag=v_mag,
         distance=distance,
     )
+    logger.info("SIM: run_6body: VAR transformed to cartesian. ")
 
     # --------------------------
     # Stellar evolution setup
     # --------------------------
     seba, seba_particles = make_seba_stars(masses, target_age)
+    logger.info("SIM: run_6body: `seba` stars made.")
 
     grav_particles = make_triple_binary_system(
         masses=masses,
@@ -120,6 +124,7 @@ def run_6_body_simulation(
         phases=phases,
         psi=psi,
     )
+    logger.info("SIM: run_6body: triple bin system made.")
 
     initial_particles = grav_particles.copy()
     total_mass = grav_particles.total_mass()
@@ -127,6 +132,7 @@ def run_6_body_simulation(
     converter = nbody_system.nbody_to_si(total_mass, length_scale)
     gravity = ph4(converter)
     gravity.particles.add_particles(grav_particles)
+    logger.info("SIM: run_6body: gravity assigned.")
 
     key_map = {g.key: s for g, s in zip(gravity.particles, seba.particles)}
 
@@ -134,18 +140,22 @@ def run_6_body_simulation(
         g.mass = s.mass
         g.radius = s.radius
 
-    logger.info("Starting simulation")
+    logger.info("SIM: run_6body: starting simulation.")
     start = time.time()
     max_time = 20 * 60
     gravity.stopping_conditions.collision_detection.enable()
+    logger.info("SIM: run_6body: stopping condition enabled.")
 
     collision_history = []
     check_every = 10 | units.yr
     # Main evolution loop
+    logger.info("SIM: run_6body: start evolution loop.")
     while t < t_end:
         if time.time() - start > max_time:
             logger.warning(
-                "Runtime > %.1f min -> End sim at t=%.1f yr.", max_time / 60, t.value_in(units.yr)
+                "SIM: run_6body: Runtime > %.1f min -> End sim at t=%.1f yr.",
+                max_time / 60,
+                t.value_in(units.yr),
             )
             break
         t += dt
@@ -166,7 +176,7 @@ def run_6_body_simulation(
             key_i, key_j = p1.key, p2.key
 
             logger.info(
-                "Collision detected at %.1f yr between keys %s, %s",
+                "SIM: run_6body: Collision detected at %.1f yr between keys %s, %s",
                 t.value_in(units.yr),
                 key_i,
                 key_j,
@@ -182,7 +192,7 @@ def run_6_body_simulation(
                 collision_history.append([key_i, key_j])
 
                 if remnant is None:
-                    logger.warning("Destructive collision -> stopping simulation")
+                    logger.warning("SIM: run_6body: Destructive collision -> stopping simulation")
                     break
 
                 # Skip to next timestep after collision
@@ -205,7 +215,7 @@ def run_6_body_simulation(
                 if is_ionized_single(idx, particles):
                     mass_msun = particles[idx].mass.in_(units.MSun).number  # extract float
                     logger.info(
-                        "Desired outcome seen at t=%.1f yr: particle %s mass=%.3f Msun is ionized.",
+                        "SIM: run_6body: Desired outcome seen at t=%.1f yr: particle %s mass=%.3f Msun is ionized.",
                         t.value_in(units.yr),
                         particles[idx].key,
                         mass_msun,
@@ -245,9 +255,9 @@ def run_6_body_simulation(
                 and (not any_bound_pair)
             ):
                 logger.info(
-                    "System is dilute & unbound at t=%.1f yr (min distance=%.1f AU). Stopping.",
+                    "SIM: run_6body: System is dilute & unbound at t=%.1f yr (min distance=%.1f AU). Stopping.",
                     t.value_in(units.yr),
-                    min_pair_distance.in_(units.AU),
+                    min_pair_distance.value_in(units.AU),
                 )
                 final_particles = gravity.particles.copy()
                 gravity.stop()
@@ -293,7 +303,7 @@ def run_6_body_simulation(
 
                 if all_compact and well_separated:
                     logger.info(
-                        "System consists of compact bound groups mutually well-separated at "
+                        "SIM: run_6body: System consists of compact bound groups mutually well-separated at "
                         "t=%.1f yr -> declaring stable and stopping.",
                         t.value_in(units.yr),
                     )

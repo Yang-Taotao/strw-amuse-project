@@ -2,6 +2,7 @@
 Monte Carlo simulation utilities for cross section calculation.
 """
 
+import logging
 from dataclasses import dataclass
 from multiprocessing import Pool, cpu_count
 
@@ -9,6 +10,8 @@ import numpy as np
 from tqdm import tqdm
 
 from .run_simulation import run_6_body_simulation
+
+logger = logging.getLogger(__name__)
 
 
 def sample_19D_lhs(n_samples, rng=None):
@@ -24,6 +27,7 @@ def sample_19D_lhs(n_samples, rng=None):
 
     if rng is None:
         rng = np.random.default_rng()
+        logger.info("MC: lhs: `rng` not found, default `rng` assigned.")
 
     # --- Define independent parameter counts ---
     # ecc, sep, v_mag, impact, theta, phi, psi, anomalies
@@ -63,10 +67,13 @@ def sample_19D_lhs(n_samples, rng=None):
 
     # Scale to parameter ranges
     samples = param_lows + lhs * (param_highs - param_lows)
+    logger.info("MC: lhs: `samples`sampled with shape %s.", samples.shape)
 
     # Fixed distances and weights
     distances = np.full((n_samples, 2), 100.0)
+    logger.info("MC: `distances` sampled with shape %s.", distances.shape)
     weights = np.ones(n_samples)
+    logger.info("MC: lhs: `weights` sampled with shape %s.", distances.shape)
 
     return samples, param_names, distances, weights
 
@@ -77,6 +84,7 @@ def _run_single_simulation(args):
     args = (sample_row, distances_row, weight)
     """
     sample_row, distances_row, w = args
+    logger.info("MC: run_single: local var unpacked to `args`.")
 
     # Column indices based on param_names in sample_19D_lhs
     # param_names = ["ecc_0","ecc_1","ecc_2", "sep_0","sep_1","sep_2",
@@ -85,33 +93,35 @@ def _run_single_simulation(args):
     #                "true_anomalies_0","true_anomalies_1","true_anomalies_2"]
 
     ecc = sample_row[0:3]
+    logger.info("MC: run_single: built `ecc` at shape %s.", ecc.shape)
     sep = sample_row[3:6]
+    logger.info("MC: run_single: built `sep` at shape %s.", sep.shape)
     v_mag = sample_row[6:8]
+    logger.info("MC: run_single: built `v_mag` at shape %s.", v_mag.shape)
     impact_parameter = sample_row[8:10]
+    logger.info("MC: run_single: built `impact_parameter` at shape %s.", impact_parameter.shape)
     theta = sample_row[10:12]
+    logger.info("MC: run_single: built `theta` at shape %s.", theta.shape)
     phi = sample_row[12:14]
+    logger.info("MC: run_single: built `phi` at shape %s.", phi.shape)
     psi = sample_row[14:16]
+    logger.info("MC: run_single: built `psi` at shape %s.", psi.shape)
     true_anomalies = sample_row[16:19]
+    logger.info("MC: run_single: built `true_anomalies` at shape %s.", true_anomalies.shape)
     distance = distances_row
+    logger.info("MC: run_single: built `distance` at shape %s.", distance.shape)
 
-    try:
-        frames, outcome = run_6_body_simulation(
-            sep=sep,
-            ecc=ecc,
-            v_mag=v_mag,
-            impact_parameter=impact_parameter,
-            theta=theta,
-            phi=phi,
-            psi=psi,
-            distance=distance,
-            true_anomalies=true_anomalies,
-            run_label="MC",
-        )
+    run_param = (sep, ecc, v_mag, impact_parameter, theta, phi, psi, distance, true_anomalies, "MC")
+    logger.info("MC: run_single: built `run_param` at length %s.", len(run_param))
+    # try:
+    logger.info("MC: run_single: run_6body try start.")
+    frames, outcome = run_6_body_simulation(*run_param)
+    logger.info("MC: run_single: run_6body finished.")
+    return outcome, w
 
-        return outcome, w
-
-    except Exception:
-        return "simulation_failed", w
+    # except Exception:
+    #     logger.warning("MC: run_single: run_6body at exception.")
+    #     return "simulation_failed", w
 
 
 @dataclass
@@ -131,13 +141,17 @@ class MonteCarloResult:
 def monte_carlo_19D(n_samples, n_cores=None, verbose=True) -> MonteCarloResult:
     if n_cores is None:
         n_cores = cpu_count()
+        logger.info("MC: main: `n_cores` not found, default to `cpu_count()` at %d.", n_cores)
 
     # Array-based samples
     samples, param_names, distances, weights = sample_19D_lhs(n_samples)
+    logger.info("MC: main: `samples, param_names, distances, weights` obtained from `lhs`.")
     pool_args = [(samples[i], distances[i], weights[i]) for i in range(n_samples)]
+    logger.info("MC: main: `pool_args` built with length %s.", len(pool_args))
 
     # Run simulations in parallel
     results = []
+    logger.info("MC: main: init `results` at `[]`.")
     with Pool(processes=n_cores) as pool:
         for summary_outcome, w in tqdm(
             pool.imap_unordered(_run_single_simulation, pool_args),
@@ -145,11 +159,14 @@ def monte_carlo_19D(n_samples, n_cores=None, verbose=True) -> MonteCarloResult:
             disable=not verbose,
         ):
             results.append((summary_outcome, w))
+            logger.info("MC: main: `results` appended with `(summary_outcome, w)`.")
 
     # Flatten stars with >=1 collision and record which MC sample they came from
     all_star_outcomes, all_star_weights, sample_ids = [], [], []
+    logger.info("MC: main: init `all_star_outcomes, all_star_weights, sample_ids` at `[], [], []`.")
     for sample_idx, (summary_outcome, w) in enumerate(results):
         if summary_outcome == "simulation_failed":
+            logger.info("MC: main: continuing at `simulation failed`.")
             continue
         stars = [s for s in summary_outcome if s["collisions"] >= 1]
         for star in stars:
@@ -164,6 +181,9 @@ def monte_carlo_19D(n_samples, n_cores=None, verbose=True) -> MonteCarloResult:
             )
             all_star_weights.append(w)
             sample_ids.append(sample_idx)  # << record MC sample index
+            logger.info(
+                "MC: main: results appended to `all_star_outcomes, all_star_weights, sample_ids`."
+            )
 
     dtype = [
         ('star_key', 'uint64'),
@@ -173,8 +193,11 @@ def monte_carlo_19D(n_samples, n_cores=None, verbose=True) -> MonteCarloResult:
         ('outcome', 'U32'),
     ]
     all_star_outcomes_array = np.array(all_star_outcomes, dtype=dtype)
+    logger.info("MC: main: build `all_star_outcomes_array`.")
     all_star_weights_array = np.array(all_star_weights, dtype=float)
+    logger.info("MC: main: build `all_star_weights_array`.")
     sample_ids_array = np.array(sample_ids, dtype=int)
+    logger.info("MC: main: build `ids_array`.")
 
     # Compute weighted counts and probabilities
     unique_outcomes, inverse_idx = np.unique(
@@ -184,6 +207,7 @@ def monte_carlo_19D(n_samples, n_cores=None, verbose=True) -> MonteCarloResult:
     for idx, w in zip(inverse_idx, all_star_weights_array):
         weighted_counts[idx] += w
     probabilities = weighted_counts / weighted_counts.sum()
+    logger.info("MC: main: all primary tasks completed.")
 
     return MonteCarloResult(
         samples=samples,
