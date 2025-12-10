@@ -2,15 +2,18 @@
 Vectorized Monte Carlo utilities for cross section calculation.
 """
 
+import logging
+import os
 from dataclasses import dataclass
-from multiprocessing import Pool, cpu_count
 
 import numpy as np
 from tqdm import tqdm
-from src.strw_amuse.utils import logger
+
+from src.strw_amuse.utils import config
+
 from .run_simulation import run_6_body_simulation
 
-logger.setup_logging()
+logger = logging.getLogger(__name__)
 
 
 # ----------------------------------------------------------------------
@@ -133,7 +136,7 @@ class MonteCarloResult:
 # ----------------------------------------------------------------------
 # Main Monte Carlo (vectorized post-processing)
 # ----------------------------------------------------------------------
-def monte_carlo_19D(n_samples, n_jobs=1, job_idx=0, verbose=True):
+def monte_carlo_19D(n_samples, n_jobs=1, job_idx=0, verbose=True, save=True):
     """
     Monte Carlo 19D simulation for a single job segment.
 
@@ -143,6 +146,8 @@ def monte_carlo_19D(n_samples, n_jobs=1, job_idx=0, verbose=True):
         Number of samples for this job.
     verbose : bool
         Show progress bar.
+    save: bool
+        Set to True to save results
     n_jobs : int
         Total number of jobs dividing the parameter space.
     job_idx : int
@@ -211,7 +216,7 @@ def monte_carlo_19D(n_samples, n_jobs=1, job_idx=0, verbose=True):
     weighted_counts = np.bincount(inv, weights=all_star_weights)
     probabilities = weighted_counts / weighted_counts.sum()
 
-    return MonteCarloResult(
+    result = MonteCarloResult(
         samples=samples,
         param_names=param_names,
         distances=distances,
@@ -223,3 +228,24 @@ def monte_carlo_19D(n_samples, n_jobs=1, job_idx=0, verbose=True):
         probabilities=probabilities,
         unique_outcomes=unique_outcomes,
     )
+
+    if save is True:
+        result_dict = {
+            'samples': result.samples,  # (nsamples, 19) param array
+            'distances': result.distances,  # (nsamples, 2)
+            'weights': result.weights,  # (nsamples,)
+            'allstaroutcomes': result.all_star_outcomes,  # Structured array
+            'allstarweights': result.all_star_weights,
+            'sampleids': result.sample_ids,
+            'probabilities': result.probabilities,  # Summary stats
+            'uniqueoutcomes': result.unique_outcomes,
+            'paramnames': np.array(result.param_names),  # For plotting labels
+            'metadata': {'nsamples': n_samples, 'njobs': n_jobs, 'jobidx': job_idx},
+        }
+
+        file_name = os.path.join(config.OUTPUT_DIR_MC, f"MC_{job_idx:04d}.npy")
+        np.save(file_name, np.array(result_dict, dtype=object))
+        logger.info("MC: job [%s] results saved.", job_idx)
+        logger.info("###===### END OF RUN ###===### END OF RUN ###===### END OF RUN ###===###")
+
+    return result

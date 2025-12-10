@@ -17,6 +17,7 @@ OUTPUT_DIR_OUTCOMES = "./data/outcomes"
 OUTPUT_DIR_FINAL_STATES = "./data/final_states"
 OUTPUT_DIR_LOGS = "./data/logs"
 OUTPUT_DIR_SNAPSHOTS = "./media/snapshots"
+OUTPUT_DIR_MC = "./data/mc"
 # ================================================================================================ #
 
 # configs - example run params

@@ -245,7 +245,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         gas_out = run_fi_collision(
             sph, t_end=0.1 | units.yr, run_label=f"{run_label}_collision{n_collision}"
         )
-        logger.info("Fi collision done")
+        # logger.info("Fi collision done")
 
         # --- Bound particle selection ---
         r = gas_out.position - gas_out.center_of_mass()

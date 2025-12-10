@@ -32,6 +32,7 @@ from ..utils.config import (
     OUTPUT_DIR_LOGS,
     OUTPUT_DIR_OUTCOMES,
     OUTPUT_DIR_SNAPSHOTS,
+    OUTPUT_DIR_MC,
 )
 
 logger = logging.getLogger(__name__)
@@ -69,12 +70,13 @@ def run_6_body_simulation(
         OUTPUT_DIR_SNAPSHOTS,
         OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
         OUTPUT_DIR_OUTCOMES,
+        OUTPUT_DIR_MC,
     )
     for d in output_dirs:
         if not os.path.exists(d):
             os.makedirs(d, exist_ok=True)
 
-    logger.info("SIM: run_6body: Logging initialized for simulation: %s", run_label)
+    logger.info("SIM: init [%s] logger.", run_label)
 
     # Set units
     target_age = age | units.Myr
@@ -89,11 +91,9 @@ def run_6_body_simulation(
     # default masses (avoid mutable default argument)
     if masses is None:
         masses = [50.0, 50.0, 50.0, 50.0, 50.0, 50.0]
-        logger.info("SIM: run_6body: VAR: `masses` is `None`, default `masses` assigned.")
     # Default psi if not provided
     if psi is None:
         psi = [0.0, 0.0, 0.0]
-        logger.info("SIM: run_6body: VAR: `psi` is `None`, default `psi` assigned.")
 
     centers, v_vectors, directions, orbit_plane, phases = transformation_to_cartesian(
         sep=sep,
@@ -104,13 +104,11 @@ def run_6_body_simulation(
         v_mag=v_mag,
         distance=distance,
     )
-    logger.info("SIM: run_6body: VAR transformed to cartesian. ")
 
     # --------------------------
     # Stellar evolution setup
     # --------------------------
     seba, seba_particles = make_seba_stars(masses, target_age)
-    logger.info("SIM: run_6body: `seba` stars made.")
 
     grav_particles = make_triple_binary_system(
         masses=masses,
@@ -124,7 +122,6 @@ def run_6_body_simulation(
         phases=phases,
         psi=psi,
     )
-    logger.info("SIM: run_6body: triple bin system made.")
 
     initial_particles = grav_particles.copy()
     total_mass = grav_particles.total_mass()
@@ -132,7 +129,6 @@ def run_6_body_simulation(
     converter = nbody_system.nbody_to_si(total_mass, length_scale)
     gravity = ph4(converter)
     gravity.particles.add_particles(grav_particles)
-    logger.info("SIM: run_6body: gravity assigned.")
 
     key_map = {g.key: s for g, s in zip(gravity.particles, seba.particles)}
 
@@ -140,16 +136,13 @@ def run_6_body_simulation(
         g.mass = s.mass
         g.radius = s.radius
 
-    logger.info("SIM: run_6body: starting simulation.")
     start = time.time()
     max_time = 20 * 60
     gravity.stopping_conditions.collision_detection.enable()
-    logger.info("SIM: run_6body: stopping condition enabled.")
 
     collision_history = []
     check_every = 10 | units.yr
     # Main evolution loop
-    logger.info("SIM: run_6body: start evolution loop.")
     while t < t_end:
         if time.time() - start > max_time:
             logger.warning(
