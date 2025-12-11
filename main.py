@@ -3,6 +3,7 @@ Main script for running the 6-body encounter simulation and visualization.
 """
 
 import os
+
 from src.strw_amuse.sims import mc  # , monte_carlo
 from src.strw_amuse.utils import logger  # , checker
 

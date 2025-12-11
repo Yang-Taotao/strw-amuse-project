@@ -31,9 +31,9 @@ from ..utils.config import (
     OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
     OUTPUT_DIR_FINAL_STATES,
     OUTPUT_DIR_LOGS,
+    OUTPUT_DIR_MC,
     OUTPUT_DIR_OUTCOMES,
     OUTPUT_DIR_SNAPSHOTS,
-    OUTPUT_DIR_MC,
 )
 
 logger = logging.getLogger(__name__)
