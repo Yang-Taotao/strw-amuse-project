@@ -8,7 +8,8 @@ import os
 import time
 
 from amuse.community.ph4.interface import ph4
-from amuse.io import write_set_to_file
+
+# from amuse.io import write_set_to_file
 from amuse.units import nbody_system, units
 
 from ..core.collision import collision
@@ -76,7 +77,7 @@ def run_6_body_simulation(
         if not os.path.exists(d):
             os.makedirs(d, exist_ok=True)
 
-    logger.info("SIM: init [%s] logger.", run_label)
+    # logger.info("SIM: init [%s] logger.", run_label)
 
     # Set units
     target_age = age | units.Myr
@@ -168,12 +169,12 @@ def run_6_body_simulation(
             p2 = sc.particles(1)[0]
             key_i, key_j = p1.key, p2.key
 
-            logger.info(
-                "SIM: run_6body: Collision detected at %.1f yr between keys %s, %s",
-                t.value_in(units.yr),
-                key_i,
-                key_j,
-            )
+            # logger.info(
+            #     "SIM: run_6body: Collision detected at %.1f yr between keys %s, %s",
+            #     t.value_in(units.yr),
+            #     key_i,
+            #     key_j,
+            # )
 
             success, remnant = collision(
                 key_i, key_j, n_collision, gravity, seba, key_map, t, run_label
@@ -185,7 +186,7 @@ def run_6_body_simulation(
                 collision_history.append([key_i, key_j])
 
                 if remnant is None:
-                    logger.warning("SIM: run_6body: Destructive collision -> stopping simulation")
+                    # logger.warning("SIM: run_6body: Destructive collision -> stopping simulation")
                     break
 
                 # Skip to next timestep after collision
@@ -224,7 +225,7 @@ def run_6_body_simulation(
                     final_filename = os.path.join(
                         OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
                     )
-                    write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+                    # write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
                     return frames, outcome
 
             # 2) Check if system is dilute & unbound:
@@ -247,11 +248,11 @@ def run_6_body_simulation(
                 and (min_pair_distance > FAR_DISTANCE)
                 and (not any_bound_pair)
             ):
-                logger.info(
-                    "SIM: run_6body: System is dilute & unbound at t=%.1f yr (min distance=%.1f AU). Stopping.",
-                    t.value_in(units.yr),
-                    min_pair_distance.value_in(units.AU),
-                )
+                # logger.info(
+                #     "SIM: run_6body: System is dilute & unbound at t=%.1f yr (min distance=%.1f AU). Stopping.",
+                #     t.value_in(units.yr),
+                #     min_pair_distance.value_in(units.AU),
+                # )
                 final_particles = gravity.particles.copy()
                 gravity.stop()
                 seba.stop()
@@ -261,7 +262,7 @@ def run_6_body_simulation(
                 final_filename = os.path.join(
                     OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
                 )
-                write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+                # write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
                 return frames, outcome
 
             # 3) If there are bound groups,
@@ -295,11 +296,11 @@ def run_6_body_simulation(
                         break
 
                 if all_compact and well_separated:
-                    logger.info(
-                        "SIM: run_6body: System consists of compact bound groups mutually well-separated at "
-                        "t=%.1f yr -> declaring stable and stopping.",
-                        t.value_in(units.yr),
-                    )
+                    # logger.info(
+                    #     "SIM: run_6body: System consists of compact bound groups mutually well-separated at "
+                    #     "t=%.1f yr -> declaring stable and stopping.",
+                    #     t.value_in(units.yr),
+                    # )
                     final_particles = gravity.particles.copy()
                     gravity.stop()
                     seba.stop()
@@ -309,5 +310,5 @@ def run_6_body_simulation(
                     final_filename = os.path.join(
                         OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
                     )
-                    write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+                    # write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
                     return frames, outcome

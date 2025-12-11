@@ -246,6 +246,5 @@ def monte_carlo_19D(n_samples, n_jobs=1, job_idx=0, verbose=True, save=True):
         file_name = os.path.join(config.OUTPUT_DIR_MC, f"MC_{job_idx:04d}.npy")
         np.save(file_name, np.array(result_dict, dtype=object))
         logger.info("MC: job [%s] results saved.", job_idx)
-        logger.info("###===### END OF RUN ###===### END OF RUN ###===### END OF RUN ###===###")
 
     return result
