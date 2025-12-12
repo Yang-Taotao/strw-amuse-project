@@ -14,6 +14,7 @@ from src.strw_amuse.utils.config import (
     N_DIMS,
     N_SAMPLES,
     BOUNDS,
+    SEED,
 )
 
 
@@ -22,6 +23,7 @@ def gen_nd_samples(
     n_dims: int = N_DIMS,
     bounds: np.ndarray = BOUNDS,
     save_dir: str = OUTPUT_DIR_SAMPLER,
+    seed: int = SEED,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
     Param sampler supporting `n` dimensions with two methods.
@@ -42,12 +44,13 @@ def gen_nd_samples(
 
     # local repo
     low, high = nd_bounds(bounds)
+    rng = np.random.default_rng(seed)
 
     # numpy sampler
-    samples_np = np.random.uniform(low, high, (n_samples, n_dims))
+    samples_np = rng.uniform(low, high, (n_samples, n_dims))
 
     # scipy sampler <- choose this
-    sampler_sp = LatinHypercube(d=n_dims)
+    sampler_sp = LatinHypercube(d=n_dims, rng=rng)
     samples_sp = sampler_sp.random(n=n_samples) * (high - low) + low
 
     return samples_np, samples_sp

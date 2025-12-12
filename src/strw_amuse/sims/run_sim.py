@@ -203,9 +203,19 @@ def run_6_body_simulation(
 
             # 1) Desired outcome: any single (ionized) star > MASS_THRESHOLD
             MASS_THRESHOLD = 70.0 | units.MSun
+            logger.info(
+                "SIM: run_6body: periodic check at t=%.1f yr, n_part=%d",
+                t.value_in(units.yr),
+                n_part,
+            )
             massive_indices = [i for i, p in enumerate(particles) if p.mass > MASS_THRESHOLD]
 
             for idx in massive_indices:
+                logger.info(
+                    "SIM: run_6body: checking candidate idx=%d, m=%.2f Msun",
+                    idx,
+                    particles[idx].mass.in_(units.MSun).number,
+                )
                 if is_ionized_single(idx, particles):
                     mass_msun = particles[idx].mass.in_(units.MSun).number  # extract float
                     logger.info(

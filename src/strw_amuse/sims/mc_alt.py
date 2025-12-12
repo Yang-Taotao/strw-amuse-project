@@ -13,7 +13,7 @@ from tqdm import tqdm
 
 from .run_sim import run_6_body_simulation
 from ..core import sampler
-from ..utils.config import OUTPUT_DIR_MC
+from ..utils.config import OUTPUT_DIR_MC, SEED
 
 logger = logging.getLogger(__name__)
 
@@ -179,6 +179,7 @@ def monte_carlo_19D(
     verbose: bool = True,
     n_workers: int | None = None,
     save: bool = True,
+    seed: int = SEED,
 ) -> MonteCarloResult:
     """
     Monte Carlo 19D simulation for one job segment using sampler.gen_nd_samples.
@@ -195,7 +196,8 @@ def monte_carlo_19D(
     # Generate full design, then slice for this job
     # Here we interpret n_samples as per-job samples.
     total_samples = n_samples * n_jobs
-    _, all_samples = sampler.gen_nd_samples(n_samples=total_samples)
+    _, all_samples = sampler.gen_nd_samples(n_samples=total_samples, seed=seed)
+    logger.info("MC: sample gen at shape %s.", all_samples.shape)
 
     start = job_idx * n_samples
     stop = start + n_samples

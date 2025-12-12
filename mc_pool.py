@@ -22,9 +22,9 @@ if __name__ == ("__main__"):
     # result = mc.monte_carlo_19D(
     #     n_samples=100,
     # )
-    n_cores = 20
+    n_cores = 30
     # MC config for local test
-    n_samples = 20  # number of 19D samples for THIS run
+    n_samples = 100  # number of 19D samples for THIS run
     n_jobs = 1  # single job locally
     job_idx = 0  # single segment
 

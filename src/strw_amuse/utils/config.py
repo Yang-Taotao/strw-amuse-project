@@ -21,10 +21,11 @@ OUTPUT_DIR_MC = "./data/mc"
 OUTPUT_DIR_SAMPLER = './media/img/param'
 # ================================================================================================ #
 
-# configs - example run params
+# configs - global param
 # ================================================================================================ #
 N_DIMS = 19
 N_SAMPLES = 10000
+SEED = 42
 BOUNDS = np.array(
     [
         [0.00, 0.99],  # ecc 1
