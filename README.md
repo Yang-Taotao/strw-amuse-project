@@ -41,6 +41,7 @@ We list the collaborators in alphabetical order.
 - See [`environment.yml`](./environment.yml) for `Conda` environment.
 - See [`pyproject.toml`](./pyproject.toml) for `Black` config.
 - See [`setup.cfg`](./setup.cfg) for `isort` and `flake8` config.
+- See [`mc.sh`](./mc.sh) for running jobs on some HPC.
 
 ## Goals
 
