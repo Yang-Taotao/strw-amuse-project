@@ -4,8 +4,9 @@ Configuation file for the STRW-AMUSE project.
 - Contain file directory settings.
 """
 
-import numpy as np
 from dataclasses import dataclass
+
+import numpy as np
 
 # configs - dir
 # ================================================================================================ #

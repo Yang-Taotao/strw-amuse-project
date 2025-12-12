@@ -3,6 +3,7 @@ Conversion utilities for converting `.npz` files into `MonteCarloResult` datacla
 """
 
 import numpy as np
+
 from src.strw_amuse.utils.config import MonteCarloResult
 
 

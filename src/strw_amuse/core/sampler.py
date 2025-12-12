@@ -4,16 +4,14 @@ MC sampler test script.
 
 import os
 
-import corner
-import matplotlib.pyplot as plt
 import numpy as np
 from scipy.stats.qmc import LatinHypercube
 
 from src.strw_amuse.utils.config import (
-    OUTPUT_DIR_SAMPLER,
+    BOUNDS,
     N_DIMS,
     N_SAMPLES,
-    BOUNDS,
+    OUTPUT_DIR_SAMPLER,
     SEED,
 )
 

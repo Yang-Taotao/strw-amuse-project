@@ -12,16 +12,15 @@ import numpy as np
 from amuse.units import units
 from matplotlib.animation import FuncAnimation, PillowWriter
 
+from ..core import sampler
 from ..utils.config import (
+    BOUNDS,
+    N_DIMS,
+    N_SAMPLES,
     OUTPUT_DIR_GIF,
     OUTPUT_DIR_IMG,
     OUTPUT_DIR_SAMPLER,
-    N_DIMS,
-    N_SAMPLES,
-    BOUNDS,
 )
-
-from ..core import sampler
 
 logger = logging.getLogger(__name__)
 
@@ -516,7 +515,8 @@ def plot_cross_section(mc_result, outcome_name, param_groups, n_bins=20, b_max_d
     outcome_name : str
         Outcome to compute cross-section for (e.g., "Creative_ionized").
     param_groups : dict
-        Keys are plot titles / labels (e.g., "ecc") and values are lists of parameter names to marginalize over.
+        Keys are plot titles / labels (e.g., "ecc")
+            values are lists of parameter names to marginalize over.
         Example: {"ecc": ["ecc_0","ecc_1","ecc_2"], "sep": ["sep_0","sep_1","sep_2"]}
     n_bins : int
         Number of bins per parameter group.

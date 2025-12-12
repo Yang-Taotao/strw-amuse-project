@@ -28,7 +28,7 @@ echo "[$SHELL] ## USER: $SLURM_JOB_USER | ID: $SLURM_JOB_ID | TASK"
 echo "[$SHELL] ## current working directory: "$CWD
 echo "[$SHELL] ## Run script"
 
-python mc_pool_hpc.py
+python mc_hpc.py
 
 echo "[$SHELL] ## Script finished"
 echo "[$SHELL] ## Job done "$DATE

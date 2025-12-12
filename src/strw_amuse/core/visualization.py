@@ -2,9 +2,9 @@
 Visualization utilities for plotting MC run saved results.
 """
 
-from ..utils.config import PARAM_CROSS_SECTION, PARAM_CORNER
-from ..plots import plotter
 from ..core import convert
+from ..plots import plotter
+from ..utils.config import PARAM_CORNER, PARAM_CROSS_SECTION
 
 
 def visualize(
@@ -22,8 +22,10 @@ def visualize(
     Args:
         file_path (str): File path to MC results `.npz` file.
         outcome_name (str): Name of the outcome to plot against.
-        param_groups (dict, optional): Dictionary of params data to load for `plot_cross_section()`. Defaults to PARAM_CROSS_SECTION.
-        param_subset (list, optional): List of param data to load for `corner_for_outcome()`. Defaults to PARAM_CORNER.
+        param_groups (dict, optional): Params data to load for `plot_cross_section()`.
+            Defaults to `PARAM_CROSS_SECTION`.
+        param_subset (list, optional): List of param data to load for `corner_for_outcome()`.
+            Defaults to `PARAM_CORNER`.
         n_bins (int, optional): Number of bins to use for plotting. Defaults to 10.
 
     Returns:

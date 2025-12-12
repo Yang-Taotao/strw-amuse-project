@@ -3,7 +3,6 @@ General helper functions for AMUSE simulation.
 """
 
 import logging
-import os
 
 import numpy as np
 from amuse.community.fi.interface import Fi
@@ -13,10 +12,14 @@ from amuse.datamodel.particle_attributes import bound_subset
 # from amuse.io import write_set_to_file  # , read_set_from_file
 from amuse.units import constants, nbody_system, units
 
-from ..utils.config import (
-    OUTPUT_DIR_COLLISIONS,
-    OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
-)
+# import os
+
+
+# enable for individual run results inspection
+# from ..utils.config import (
+#     OUTPUT_DIR_COLLISIONS,
+#     OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
+# )
 
 logger = logging.getLogger(__name__)
 
@@ -197,10 +200,9 @@ def run_fi_collision(gas, t_end=0.1 | units.yr, min_mass=1e-6 | units.MSun, run_
     diag_particles.add_particle(diag_particle)
 
     # file name
-    diag_filename = os.path.join(
-        OUTPUT_DIR_COLLISIONS_DIAGNOSTICS, f"collision_diag_{run_label}.amuse"
-    )
-
+    # diag_filename = os.path.join(
+    #     OUTPUT_DIR_COLLISIONS_DIAGNOSTICS, f"collision_diag_{run_label}.amuse"
+    # )
     # write_set_to_file(diag_particles, diag_filename, "amuse", overwrite_file=True)
 
     return gas_out
@@ -236,10 +238,10 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         sph.velocity -= sph.center_of_mass_velocity()
 
         # Save SPH initial state
-        final_filename = os.path.join(
-            OUTPUT_DIR_COLLISIONS,
-            f"collision_{n_collision}_sph_input_{run_label}.amuse",
-        )
+        # final_filename = os.path.join(
+        #     OUTPUT_DIR_COLLISIONS,
+        #     f"collision_{n_collision}_sph_input_{run_label}.amuse",
+        # )
         # write_set_to_file(sph, final_filename, "amuse", overwrite_file=True)
 
         # Run Fi

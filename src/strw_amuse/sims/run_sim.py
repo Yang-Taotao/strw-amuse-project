@@ -170,7 +170,9 @@ def run_6_body_simulation(
             key_i, key_j = p1.key, p2.key
 
             # logger.info(
-            #     "SIM: run_6body: Collision detected at %.1f yr between keys %s, %s",
+            #     """
+            #     SIM: run_6body: Collision detected at %.1f yr between keys %s, %s
+            #     """,
             #     t.value_in(units.yr),
             #     key_i,
             #     key_j,
@@ -219,7 +221,10 @@ def run_6_body_simulation(
                 if is_ionized_single(idx, particles):
                     mass_msun = particles[idx].mass.in_(units.MSun).number  # extract float
                     logger.info(
-                        "SIM: run_6body: Desired outcome seen at t=%.1f yr: particle %s mass=%.3f Msun is ionized.",
+                        """
+                        SIM: run_6body: Desired outcome seen
+                        t=%.1f yr: particle %s mass=%.3f Msun is ionized.
+                        """,
                         t.value_in(units.yr),
                         particles[idx].key,
                         mass_msun,
@@ -232,10 +237,12 @@ def run_6_body_simulation(
                     outcome = outcomes(
                         initial_particles, final_particles, collision_history, run_label=run_label
                     )
-                    final_filename = os.path.join(
-                        OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
-                    )
-                    # write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+                    # final_filename = os.path.join(
+                    #     OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
+                    # )
+                    # write_set_to_file(
+                    #   final_particles, final_filename, "amuse", overwrite_file=True
+                    # )
                     return frames, outcome
 
             # 2) Check if system is dilute & unbound:
@@ -259,7 +266,10 @@ def run_6_body_simulation(
                 and (not any_bound_pair)
             ):
                 # logger.info(
-                #     "SIM: run_6body: System is dilute & unbound at t=%.1f yr (min distance=%.1f AU). Stopping.",
+                #     """
+                #     SIM: run_6body: System is dilute & unbound
+                #     t=%.1f yr (min distance=%.1f AU). Stopping.
+                #     """,
                 #     t.value_in(units.yr),
                 #     min_pair_distance.value_in(units.AU),
                 # )
@@ -269,9 +279,9 @@ def run_6_body_simulation(
                 outcome = outcomes(
                     initial_particles, final_particles, collision_history, run_label=run_label
                 )
-                final_filename = os.path.join(
-                    OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
-                )
+                # final_filename = os.path.join(
+                #     OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
+                # )
                 # write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
                 return frames, outcome
 
@@ -307,8 +317,10 @@ def run_6_body_simulation(
 
                 if all_compact and well_separated:
                     # logger.info(
-                    #     "SIM: run_6body: System consists of compact bound groups mutually well-separated at "
-                    #     "t=%.1f yr -> declaring stable and stopping.",
+                    #     """
+                    #     SIM: run_6body: System consists of compact bound groups
+                    #     mutually well-separated at t=%.1f yr -> declaring stable and stopping.
+                    #     """,
                     #     t.value_in(units.yr),
                     # )
                     final_particles = gravity.particles.copy()
@@ -317,8 +329,10 @@ def run_6_body_simulation(
                     outcome = outcomes(
                         initial_particles, final_particles, collision_history, run_label=run_label
                     )
-                    final_filename = os.path.join(
-                        OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
-                    )
-                    # write_set_to_file(final_particles, final_filename, "amuse", overwrite_file=True)
+                    # final_filename = os.path.join(
+                    #     OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
+                    # )
+                    # write_set_to_file(
+                    #     final_particles, final_filename, "amuse", overwrite_file=True
+                    # )
                     return frames, outcome

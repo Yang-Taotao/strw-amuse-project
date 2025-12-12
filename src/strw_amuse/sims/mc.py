@@ -10,9 +10,9 @@ from multiprocessing import Pool, cpu_count
 import numpy as np
 from tqdm import tqdm
 
-from .run_sim import run_6_body_simulation
 from ..core import sampler
 from ..utils.config import OUTPUT_DIR_MC, SEED, MonteCarloResult
+from .run_sim import run_6_body_simulation
 
 logger = logging.getLogger(__name__)
 
