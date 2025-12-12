@@ -1,14 +1,27 @@
+"""
+Conversion utilities for converting `.npz` files into `MonteCarloResult` dataclass.
+"""
+
 import numpy as np
-from src.strw_amuse.sims import mc_alt
-from src.strw_amuse.utils.config import PARAM_CROSS_SECTION, PARAM_CORNER
-from src.strw_amuse.plots import plotter
+from src.strw_amuse.utils.config import MonteCarloResult
 
 
-def to_MonteCarloResults(file_path) -> mc_alt.MonteCarloResult:
+def to_MonteCarloResults(file_path: str) -> MonteCarloResult:
+    """
+    MC results converter
+    - Load mc results from `file_path`
+    - Convert to `MonteCarloResult` dataclass
+
+    Args:
+        file_path (str): File path of `.npz` file.
+
+    Returns:
+        MonteCarloResult: MonteCarloResult dataclass for analysis.
+    """
 
     data = np.load(file_path, allow_pickle=True)
 
-    result = mc_alt.MonteCarloResult(
+    result = MonteCarloResult(
         samples=data["samples"],
         param_names=list(data["param_names"]),
         distances=data["distances"],
@@ -21,22 +34,3 @@ def to_MonteCarloResults(file_path) -> mc_alt.MonteCarloResult:
         unique_outcomes=data["unique_outcomes"],
     )
     return result
-
-
-def visualize(
-    file_path, outcome_name, param_groups=PARAM_CROSS_SECTION, param_subset=PARAM_CORNER, n_bins=10
-) -> None:
-    data_result = to_MonteCarloResults(file_path=file_path)
-    plotter.plot_cross_section(
-        mc_result=data_result,
-        outcome_name=outcome_name,
-        param_groups=param_groups,
-        n_bins=n_bins,
-    )
-    plotter.corner_for_outcome(
-        mc_result=data_result,
-        outcome_name=outcome_name,
-        param_subset=param_subset,
-        bins=n_bins,
-    )
-    return None

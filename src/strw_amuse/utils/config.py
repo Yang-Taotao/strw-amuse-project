@@ -5,6 +5,7 @@ Configuation file for the STRW-AMUSE project.
 """
 
 import numpy as np
+from dataclasses import dataclass
 
 # configs - dir
 # ================================================================================================ #
@@ -68,6 +69,26 @@ PARAM_CORNER = [
     "v_mag_1",
 ]
 # ================================================================================================ #
+
+
+# configs - MC dataclass
+# ================================================================================================ #
+@dataclass
+class MonteCarloResult:
+    samples: np.ndarray
+    param_names: list
+    distances: np.ndarray
+    weights: np.ndarray
+    all_star_outcomes: np.ndarray
+    all_star_weights: np.ndarray
+    sample_ids: np.ndarray
+    weighted_counts: np.ndarray
+    probabilities: np.ndarray
+    unique_outcomes: np.ndarray
+
+
+# ================================================================================================ #
+
 
 # configs - example run params
 # ================================================================================================ #

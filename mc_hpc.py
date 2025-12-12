@@ -8,7 +8,7 @@ warnings.filterwarnings(
 
 import os
 import logging
-from src.strw_amuse.sims import mc_alt
+from src.strw_amuse.sims import mc
 from src.strw_amuse.utils import logger
 import multiprocessing
 
@@ -27,7 +27,7 @@ if __name__ == "__main__":
     n_samples = samples_per_job  # samples this job will actually run
     n_workers = 20  # or 30, depending on node
 
-    result = mc_alt.monte_carlo_19D(
+    result = mc.monte_carlo_19D(
         n_samples=n_samples,
         n_jobs=n_jobs,
         job_idx=job_idx,
