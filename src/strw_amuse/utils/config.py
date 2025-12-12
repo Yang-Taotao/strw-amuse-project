@@ -49,6 +49,24 @@ BOUNDS = np.array(
         [0.00, 2 * np.pi],  # true_anomalies 3
     ]
 )
+PARAM_CROSS_SECTION = {
+    "impact parameter": ["impact_parameter_0", "impact_parameter_1"],
+    "eccentricity": ["ecc_0", "ecc_1", "ecc_2"],
+    "separation": ["sep_0", "sep_1", "sep_2"],
+    "v_mag": ["v_mag_0", "v_mag_1"],
+}
+PARAM_CORNER = [
+    "ecc_0",
+    "ecc_1",
+    "ecc_2",
+    "sep_0",
+    "sep_1",
+    "sep_2",
+    "impact_parameter_0",
+    "impact_parameter_1",
+    "v_mag_0",
+    "v_mag_1",
+]
 # ================================================================================================ #
 
 # configs - example run params
