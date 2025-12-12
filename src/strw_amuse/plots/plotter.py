@@ -12,7 +12,15 @@ import numpy as np
 from amuse.units import units
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-from ..utils.config import OUTPUT_DIR_GIF, OUTPUT_DIR_IMG
+from ..core import sampler
+from ..utils.config import (
+    BOUNDS,
+    N_DIMS,
+    N_SAMPLES,
+    OUTPUT_DIR_GIF,
+    OUTPUT_DIR_IMG,
+    OUTPUT_DIR_SAMPLER,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -389,3 +397,240 @@ def plot_corner_marginalized(samples, results, outcome_name="creative_ionized", 
     )
 
     plt.show()
+
+
+def sampler_nd_coverage_plot(
+    samples_np: np.ndarray,
+    samples_sp: np.ndarray,
+    n_samples: int = N_SAMPLES,
+    n_dims: int = N_DIMS,
+    bounds: np.ndarray = BOUNDS,
+    save_dir: str = OUTPUT_DIR_SAMPLER,
+) -> None:
+    """
+    General plotter for sample coverage visualization.
+
+    Args:
+        samples_np (np.ndarray): Uniform samples from `numpy.random.uniform()`.
+        samples_sp (np.ndarray): LHS samples from `scipy.stats.qmc.LatinHyperCube()`
+        n_samples (int, optional): Defaults to N_SAMPLES.
+        n_dims (int, optional): Defaults to N_DIMS.
+        bounds (np.ndarray, optional): Defaults to BOUNDS.
+        save_dir (str, optional): Defaults to OUTPUT_DIR_SAMPLER.
+    """
+
+    # local repo
+    low, high = sampler.nd_bounds(bounds)
+    coverage_np = sampler.nd_coverage(samples_np)
+    coverage_sp = sampler.nd_coverage(samples_sp)
+
+    # fig init
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+    # Left: Uniform coverage
+    bars_np = ax1.bar(range(n_dims), coverage_np, color='blue', alpha=0.7, label='Uniform')
+    ax1.axhline(1.0, color='red', ls='--', lw=2, label='Perfect 100%')
+    ax1.set_ylim(0, 1.05)
+    ax1.set_xlabel('Parameter Index')
+    ax1.set_ylabel('Range Coverage')
+    ax1.set_title('Uniform: Coverage')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    # Right: LHS coverage
+    bars_sp = ax2.bar(range(n_dims), coverage_sp, color='green', alpha=0.8, label='LHS')
+    ax2.axhline(1.0, color='red', ls='--', lw=2, label='Perfect 100%')
+    ax2.set_ylim(0, 1.05)
+    ax2.set_xlabel('Parameter Index')
+    ax2.set_ylabel('Range Coverage')
+    ax2.set_title('LHS: Coverage')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+
+    # 1d param converage comparison
+    for i, cov in enumerate(coverage_sp):
+        if cov > 0.99:
+            ax2.text(i, cov + 0.01, '✓', ha='center', va='bottom', fontsize=14, color='red')
+
+    plt.suptitle('Parameter Space Coverage Comparison', fontsize=16)
+    plt.tight_layout()
+    plt.savefig(f'{save_dir}/1d_param_coverage_comparison.png', dpi=150, bbox_inches='tight')
+    plt.close()
+
+    # corner
+    fig_left = plt.figure(figsize=(20, 20))
+    corner.corner(
+        samples_np,
+        fig=fig_left,
+        color='blue',
+        alpha=0.6,
+        labels=[f'p{i}' for i in range(n_dims)],
+        range=[(low[i], high[i]) for i in range(n_dims)],
+        quantiles=[0.25, 0.5, 0.75],
+        smooth=0.05,
+        plot_datapoints=False,
+        plot_density=False,
+    )
+
+    fig_left.suptitle(f'Uniform Corner Plot ({n_samples} samples)', fontsize=16)
+    plt.savefig(f'{save_dir}/uniform.png', dpi=100, bbox_inches='tight')
+    plt.close(fig_left)
+
+    fig_right = plt.figure(figsize=(20, 20))
+    corner.corner(
+        samples_sp,
+        fig=fig_right,
+        color='green',
+        alpha=0.7,
+        labels=[f'p{i}' for i in range(n_dims)],
+        range=[(low[i], high[i]) for i in range(n_dims)],
+        quantiles=[0.25, 0.5, 0.75],
+        smooth=0.05,
+        plot_datapoints=False,
+    )  # SAFE
+
+    fig_right.suptitle(f'LHS Corner Plot ({n_samples} samples)', fontsize=16)
+    plt.savefig(f'{save_dir}/lhs.png', dpi=100, bbox_inches='tight')
+    plt.close(fig_right)
+
+    # Summary stats
+    print("\n" + "=" * 50)
+    print("1D COVERAGE SUMMARY")
+    print("=" * 50)
+    print(f"Uniform sampling avg: {np.mean(coverage_np):.1%} ± {np.std(coverage_np):.1%}")
+    print(f"LHS     sampling avg: {np.mean(coverage_sp):.1%} ± {np.std(coverage_sp):.1%}")
+    print(f"LHS          perfect: {sum(1 for x in coverage_sp if x > 0.99)}/19")
+    print(f"Uniform      perfect: {sum(1 for x in coverage_np if x > 0.99)}/19")
+    print("=" * 50)
+
+
+def plot_cross_section(mc_result, outcome_name, param_groups, n_bins=20, b_max_dict=None):
+    """
+    Plot differential cross-section vs parameters for a given outcome.
+
+    Parameters
+    ----------
+    mc_result : MonteCarloResult
+        Monte Carlo result object.
+    outcome_name : str
+        Outcome to compute cross-section for (e.g., "Creative_ionized").
+    param_groups : dict
+        Keys are plot titles / labels (e.g., "ecc")
+            values are lists of parameter names to marginalize over.
+        Example: {"ecc": ["ecc_0","ecc_1","ecc_2"], "sep": ["sep_0","sep_1","sep_2"]}
+    n_bins : int
+        Number of bins per parameter group.
+    b_max_dict : dict or None
+        Optional dictionary specifying max bin values per group.
+    show : bool
+        Whether to show the plot immediately.
+    """
+    # Mask stars with desired outcome
+    save_dir = OUTPUT_DIR_IMG
+
+    outcome_mask = mc_result.all_star_outcomes['outcome'] == outcome_name
+    if not np.any(outcome_mask):
+        print(f"No stars produced outcome '{outcome_name}'")
+        return
+
+    weights = mc_result.all_star_weights[outcome_mask]
+    sample_ids = mc_result.sample_ids[outcome_mask]
+
+    n_plots = len(param_groups)
+    plt.figure(figsize=(5 * n_plots, 4))
+
+    for i, (group_name, param_names) in enumerate(param_groups.items(), start=1):
+        # Collect all parameter values for the group
+        param_values_list = []
+        for pname in param_names:
+            col_idx = [j for j, name in enumerate(mc_result.param_names) if name == pname]
+            if len(col_idx) == 0:
+                raise ValueError(f"Parameter {pname} not found in samples")
+            param_values = mc_result.samples[sample_ids, col_idx[0]]
+            param_values_list.append(param_values)
+
+        # Flatten for marginalization
+        all_values = np.hstack([v[:, None] for v in param_values_list]).flatten()
+        all_weights = np.hstack([weights[:, None] for _ in param_values_list]).flatten()
+
+        # Define bins
+        if b_max_dict is None or group_name not in b_max_dict:
+            b_max = np.max(all_values) * 1.05
+        else:
+            b_max = b_max_dict[group_name]
+        b_bins = np.linspace(0, b_max, n_bins + 1)
+        b_centers = 0.5 * (b_bins[:-1] + b_bins[1:])
+
+        sigma_binned = np.zeros(n_bins)
+        sigma_err = np.zeros(n_bins)
+
+        for j in range(n_bins):
+            mask = (all_values >= b_bins[j]) & (all_values < b_bins[j + 1])
+            w_bin = all_weights[mask]
+            if len(w_bin) == 0:
+                continue
+            area = np.pi * (b_bins[j + 1] ** 2 - b_bins[j] ** 2)  # keep same definition
+            sigma_binned[j] = area * np.sum(w_bin)
+            sigma_err[j] = area * np.sqrt(np.sum(w_bin**2))
+
+        # Plot
+        ax = plt.subplot(1, n_plots, i)
+        ax.errorbar(b_centers, sigma_binned, yerr=sigma_err, fmt='o', capsize=3, color='C0')
+        ax.plot(b_centers, sigma_binned, '-', color='C0')
+        ax.set_xlabel(group_name)
+        ax.set_ylabel(r"$\sigma_\mathrm{ionized}$ [AU$^2$]")
+        ax.grid(True)
+
+    plt.tight_layout()
+    plt.savefig(f'{save_dir}/cross_section.png')
+    plt.close()
+
+
+def corner_for_outcome(
+    mc_result, outcome_name, param_subset=None, bins=25, title_fmt=".2f", show_titles=True
+):
+    """
+    Generate a corner plot for samples that produced a given outcome.
+
+    Parameters
+    ----------
+    mc_result : MonteCarloResult
+        The object returned from `monte_carlo_19D`.
+    outcome_name : str
+        The outcome to filter on (e.g., "Creative_ionized").
+    param_subset : list of str, optional
+        Subset of parameter names to include in the corner plot. Default is all.
+    bins : int
+        Number of bins for histograms.
+    title_fmt : str
+        Formatting for histogram titles.
+    show_titles : bool
+        Whether to show titles on each subplot.
+    """
+
+    # ---- 1. Identify stars with the desired outcome ----
+    save_dir = OUTPUT_DIR_IMG
+    outcome_mask = mc_result.all_star_outcomes['outcome'] == outcome_name
+    if not np.any(outcome_mask):
+        print(f"No samples produced outcome '{outcome_name}'")
+        return
+
+    # Map stars back to unique MC sample rows
+    sample_rows = np.unique(mc_result.sample_ids[outcome_mask])
+
+    # ---- 2. Select parameters to plot ----
+    if param_subset is None:
+        data_to_plot = mc_result.samples[sample_rows, :]
+        labels = mc_result.param_names
+    else:
+        # Find indices of selected parameters
+        indices = [mc_result.param_names.index(p) for p in param_subset]
+        data_to_plot = mc_result.samples[sample_rows][:, indices]
+        labels = param_subset
+
+    # ---- 3. Make corner plot ----
+    fig = corner.corner(
+        data_to_plot, labels=labels, bins=bins, show_titles=show_titles, title_fmt=title_fmt
+    )
+    plt.savefig(f'{save_dir}/corner.png')
+    plt.close()

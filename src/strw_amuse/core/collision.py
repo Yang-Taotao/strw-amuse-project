@@ -3,19 +3,23 @@ General helper functions for AMUSE simulation.
 """
 
 import logging
-import os
 
 import numpy as np
 from amuse.community.fi.interface import Fi
 from amuse.datamodel import Particle, Particles
 from amuse.datamodel.particle_attributes import bound_subset
-from amuse.io import write_set_to_file  # , read_set_from_file
+
+# from amuse.io import write_set_to_file  # , read_set_from_file
 from amuse.units import constants, nbody_system, units
 
-from ..utils.config import (
-    OUTPUT_DIR_COLLISIONS,
-    OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
-)
+# import os
+
+
+# enable for individual run results inspection
+# from ..utils.config import (
+#     OUTPUT_DIR_COLLISIONS,
+#     OUTPUT_DIR_COLLISIONS_DIAGNOSTICS,
+# )
 
 logger = logging.getLogger(__name__)
 
@@ -196,11 +200,10 @@ def run_fi_collision(gas, t_end=0.1 | units.yr, min_mass=1e-6 | units.MSun, run_
     diag_particles.add_particle(diag_particle)
 
     # file name
-    diag_filename = os.path.join(
-        OUTPUT_DIR_COLLISIONS_DIAGNOSTICS, f"collision_diag_{run_label}.amuse"
-    )
-
-    write_set_to_file(diag_particles, diag_filename, "amuse", overwrite_file=True)
+    # diag_filename = os.path.join(
+    #     OUTPUT_DIR_COLLISIONS_DIAGNOSTICS, f"collision_diag_{run_label}.amuse"
+    # )
+    # write_set_to_file(diag_particles, diag_filename, "amuse", overwrite_file=True)
 
     return gas_out
 
@@ -217,7 +220,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         p_j = next((p for p in gravity.particles if p.key == key_j), None)
 
         if p_i is None or p_j is None:
-            logger.warning("Collision aborted: keys %s,%s not found.", key_i, key_j)
+            # logger.warning("Collision aborted: keys %s,%s not found.", key_i, key_j)
             return False, None
 
         # Build SPH initial conditions
@@ -235,17 +238,17 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         sph.velocity -= sph.center_of_mass_velocity()
 
         # Save SPH initial state
-        final_filename = os.path.join(
-            OUTPUT_DIR_COLLISIONS,
-            f"collision_{n_collision}_sph_input_{run_label}.amuse",
-        )
-        write_set_to_file(sph, final_filename, "amuse", overwrite_file=True)
+        # final_filename = os.path.join(
+        #     OUTPUT_DIR_COLLISIONS,
+        #     f"collision_{n_collision}_sph_input_{run_label}.amuse",
+        # )
+        # write_set_to_file(sph, final_filename, "amuse", overwrite_file=True)
 
         # Run Fi
         gas_out = run_fi_collision(
             sph, t_end=0.1 | units.yr, run_label=f"{run_label}_collision{n_collision}"
         )
-        logger.info("Fi collision done")
+        # logger.info("Fi collision done")
 
         # --- Bound particle selection ---
         r = gas_out.position - gas_out.center_of_mass()
@@ -257,7 +260,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         bound_mask = e_spec.value_in(units.m**2 / units.s**2) < 0.0
 
         if not np.any(bound_mask):
-            logger.warning("No bound particles found: destructive collision")
+            # logger.warning("No bound particles found: destructive collision")
             return remove_colliders(gravity, seba, key_map, [key_i, key_j])
 
         bound_particles = gas_out[bound_mask]
@@ -266,7 +269,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
 
         # --- Very small remnant → destructive ---
         if m_bound <= (5 | units.MSun):
-            logger.warning("Very small remnant mass; destructive collision")
+            # logger.warning("Very small remnant mass; destructive collision")
             return remove_colliders(gravity, seba, key_map, [key_i, key_j])
 
         # --- Compute remnant velocity preserving SPH internal motion ---
@@ -305,19 +308,19 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         # Update key_map
         key_map[p_i.key] = remnant_seba
 
-        logger.info(
-            "Collision %d finished: remnant = %.2f Msun (replacing %s, removed %s)",
-            n_collision,
-            m_bound.value_in(units.MSun),
-            key_i,
-            key_j,
-        )
+        # logger.info(
+        #     "Collision %d finished: remnant = %.2f Msun (replacing %s, removed %s)",
+        #     n_collision,
+        #     m_bound.value_in(units.MSun),
+        #     key_i,
+        #     key_j,
+        # )
 
         return True, p_i
 
     except Exception:
         # Log full traceback for debugging; do not silently swallow exceptions
-        logger.exception("Collision handling failed for keys %s,%s", key_i, key_j)
+        # logger.exception("Collision handling failed for keys %s,%s", key_i, key_j)
         return False, None
 
 

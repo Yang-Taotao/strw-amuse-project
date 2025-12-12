@@ -18,7 +18,7 @@ except ImportError:  # pragma: no cover - mpi4py may not be installed in tests
     MPI = None
 
 
-def _get_mpi_rank():
+def _get_mpi_rank() -> None | int:
     """
     Return the MPI rank if available, otherwise `None`.
 
@@ -40,7 +40,9 @@ def _get_mpi_rank():
         return None
 
 
-def setup_logging(rank=None, log_dir=OUTPUT_DIR_LOGS, level=logging.INFO, name="src.strw_amuse"):
+def setup_logging(
+    rank=None, log_dir=OUTPUT_DIR_LOGS, level=logging.INFO, name="src.strw_amuse"
+) -> logging.Logger:
     """
     Configure logging for the package.
 

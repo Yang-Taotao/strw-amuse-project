@@ -7,7 +7,8 @@ import os
 
 from amuse.datamodel import Particle, Particles
 from amuse.datamodel.particle_attributes import bound_subset
-from amuse.io import write_set_to_file
+
+# from amuse.io import write_set_to_file
 from amuse.units import constants, units
 
 from ..utils.config import OUTPUT_DIR_COLLISIONS_OUTCOMES
@@ -211,7 +212,7 @@ def outcomes(
             )
 
     # Save outcomes to AMUSE file
-    filename = os.path.join(output_dir, f"outcomes_{run_label}.amuse")
-    write_set_to_file(outcome_particles, filename, "amuse", overwrite_file=True)
+    # filename = os.path.join(output_dir, f"outcomes_{run_label}.amuse")
+    # write_set_to_file(outcome_particles, filename, "amuse", overwrite_file=True)
 
     return summary_outcome
