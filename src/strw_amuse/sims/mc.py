@@ -1,5 +1,5 @@
 """
-Vectorized Monte Carlo utilities for cross section calculation.
+Monte Carlo utilities for cross section calculation.
 """
 
 import logging
@@ -9,83 +9,26 @@ from dataclasses import dataclass
 import numpy as np
 from tqdm import tqdm
 
-from src.strw_amuse.utils import config
-
-from .run_simulation import run_6_body_simulation
+from .run_sim import run_6_body_simulation
+from ..core import sampler
 
 logger = logging.getLogger(__name__)
 
 
-# ----------------------------------------------------------------------
-#  Vectorized Latin Hypercube
-# ----------------------------------------------------------------------
-def sample_19D_lhs(n_samples, rng=None, n_jobs=1, job_idx=0):
-    """
-    Generate stratified Latin Hypercube samples in the fixed 19D parameter space,
-    optionally splitting the parameter ranges by job index.
-
-    Parameters
-    ----------
-    n_samples : int
-        Number of samples to generate for this job.
-    rng : np.random.Generator
-        Random number generator.
-    n_jobs : int
-        Total number of jobs splitting the parameter ranges.
-    job_idx : int
-        Index of this job (0-based).
-
-    Returns
-    -------
-    samples : np.ndarray, shape (n_samples, 19)
-    param_names : list of str
-    distances : np.ndarray, shape (n_samples, 2)
-    weights : np.ndarray, shape (n_samples,)
-    """
-    if rng is None:
-        rng = np.random.default_rng()
-
-    param_counts = np.array([3, 3, 2, 2, 2, 2, 2, 3])
-    param_labels = [
-        "ecc",
-        "sep",
-        "v_mag",
-        "impact_parameter",
-        "theta",
-        "phi",
-        "psi",
-        "true_anomalies",
-    ]
-    lower_bounds = np.array([0.0, 2.0, 0.1, 0.0, 0.0, 0.0, 0.0, 0.0])
-    upper_bounds = np.array([0.99, 7.0, 1.0, 5.0, np.pi / 2, 2 * np.pi, 2 * np.pi, 2 * np.pi])
-
-    # Expand bounds vectorized
-    param_names = [
-        f"{label}_{i}" for label, count in zip(param_labels, param_counts) for i in range(count)
-    ]
-    param_lows = np.repeat(lower_bounds, param_counts)
-    param_highs = np.repeat(upper_bounds, param_counts)
-    n_params = param_lows.size
-
-    # Split ranges according to job index
-    ranges = param_highs - param_lows
-    segment_size = ranges / n_jobs
-    job_lows = param_lows + job_idx * segment_size
-    job_highs = job_lows + segment_size
-
-    # Latin Hypercube sampling inside this job's segment
-    lhs = (rng.uniform(size=(n_samples, n_params)) + np.arange(n_samples)[:, None]) / n_samples
-    samples = job_lows + lhs * (job_highs - job_lows)
-
-    distances = np.full((n_samples, 2), 100.0)
-    weights = np.ones(n_samples)
-
-    return samples, param_names, distances, weights
+@dataclass
+class MonteCarloResult:
+    samples: np.ndarray
+    param_names: list
+    distances: np.ndarray
+    weights: np.ndarray
+    all_star_outcomes: np.ndarray
+    all_star_weights: np.ndarray
+    sample_ids: np.ndarray
+    weighted_counts: np.ndarray
+    probabilities: np.ndarray
+    unique_outcomes: np.ndarray
 
 
-# ----------------------------------------------------------------------
-# Worker
-# ----------------------------------------------------------------------
 def _run_single_simulation(args):
     sample_row, distance_row, w = args
 
@@ -116,74 +59,58 @@ def _run_single_simulation(args):
         return "simulation_failed", w
 
 
-# ----------------------------------------------------------------------
-# Result container
-# ----------------------------------------------------------------------
-@dataclass
-class MonteCarloResult:
-    samples: np.ndarray
-    param_names: list
-    distances: np.ndarray
-    weights: np.ndarray
-    all_star_outcomes: np.ndarray
-    all_star_weights: np.ndarray
-    sample_ids: np.ndarray
-    weighted_counts: np.ndarray
-    probabilities: np.ndarray
-    unique_outcomes: np.ndarray
-
-
-# ----------------------------------------------------------------------
-# Main Monte Carlo (vectorized post-processing)
-# ----------------------------------------------------------------------
-def monte_carlo_19D(n_samples, n_jobs=1, job_idx=0, verbose=True, save=True):
+def monte_carlo_19D(n_samples, verbose=True):
     """
-    Monte Carlo 19D simulation for a single job segment.
+    Monte Carlo 19D simulation for a single job segment using `sampler.gen_nd_samples`.
 
-    Parameters
-    ----------
-    n_samples : int
-        Number of samples for this job.
-    verbose : bool
-        Show progress bar.
-    save: bool
-        Set to True to save results
-    n_jobs : int
-        Total number of jobs dividing the parameter space.
-    job_idx : int
-        Index of this job (0-based).
-
-    Returns
-    -------
-    MonteCarloResult
+    Returns a `MonteCarloResult` dataclass with flattened star outcomes and mapping to sample rows.
     """
-    # Generate samples for this job's segment
-    samples, param_names, distances, weights = sample_19D_lhs(
-        n_samples, n_jobs=n_jobs, job_idx=job_idx
-    )
+    # --------------------------
+    # Generate samples
+    # --------------------------
+    _, samples = sampler.gen_nd_samples(n_samples=n_samples)
 
+    # Since your old function returned param_names, distances, weights
+    # we reconstruct them here
+    param_counts = np.array([3, 3, 2, 2, 2, 2, 2, 3])
+    param_labels = [
+        "ecc",
+        "sep",
+        "v_mag",
+        "impact_parameter",
+        "theta",
+        "phi",
+        "psi",
+        "true_anomalies",
+    ]
+    param_names = [
+        f"{label}_{i}" for label, count in zip(param_labels, param_counts) for i in range(count)
+    ]
+    distances = np.full((n_samples, 2), 100.0)
+    weights = np.ones(n_samples)
+
+    # --------------------------
+    # Prepare args for simulation
+    # --------------------------
     pool_args = list(zip(samples, distances, weights))
     results = []
 
-    # Run sequentially
+    # Sequential execution (can parallelize with Pool later)
     for args in tqdm(pool_args, total=n_samples, disable=not verbose):
         outcome, w = _run_single_simulation(args)
         results.append((outcome, w))
 
     # ----------------------------------------
-    # Vectorized extraction of star outcomes
+    # Flatten stars with >=1 collision and store sample mapping
     # ----------------------------------------
-    valid_mask = np.array([r[0] != "simulation_failed" for r in results])
-    valid_indices = np.nonzero(valid_mask)[0]
-
     flat_data = []
     flat_weights = []
     flat_ids = []
 
-    for idx in valid_indices:
-        outcome, w = results[idx]
+    for sample_idx, (outcome, w) in enumerate(results):
+        if outcome == "simulation_failed":
+            continue
         stars = [s for s in outcome if s["collisions"] >= 1]
-
         for s in stars:
             flat_data.append(
                 (
@@ -195,7 +122,7 @@ def monte_carlo_19D(n_samples, n_jobs=1, job_idx=0, verbose=True, save=True):
                 )
             )
             flat_weights.append(w)
-            flat_ids.append(idx)
+            flat_ids.append(sample_idx)
 
     dtype = [
         ("star_key", "uint64"),
@@ -210,13 +137,13 @@ def monte_carlo_19D(n_samples, n_jobs=1, job_idx=0, verbose=True, save=True):
     sample_ids = np.array(flat_ids)
 
     # ----------------------------------------
-    # Vectorized weighted outcome counts
+    # Compute weighted counts and probabilities
     # ----------------------------------------
-    unique_outcomes, inv = np.unique(all_star_outcomes["outcome"], return_inverse=True)
-    weighted_counts = np.bincount(inv, weights=all_star_weights)
+    unique_outcomes, inv_idx = np.unique(all_star_outcomes["outcome"], return_inverse=True)
+    weighted_counts = np.bincount(inv_idx, weights=all_star_weights)
     probabilities = weighted_counts / weighted_counts.sum()
 
-    result = MonteCarloResult(
+    return MonteCarloResult(
         samples=samples,
         param_names=param_names,
         distances=distances,
@@ -228,23 +155,3 @@ def monte_carlo_19D(n_samples, n_jobs=1, job_idx=0, verbose=True, save=True):
         probabilities=probabilities,
         unique_outcomes=unique_outcomes,
     )
-
-    if save is True:
-        result_dict = {
-            'samples': result.samples,  # (nsamples, 19) param array
-            'distances': result.distances,  # (nsamples, 2)
-            'weights': result.weights,  # (nsamples,)
-            'allstaroutcomes': result.all_star_outcomes,  # Structured array
-            'allstarweights': result.all_star_weights,
-            'sampleids': result.sample_ids,
-            'probabilities': result.probabilities,  # Summary stats
-            'uniqueoutcomes': result.unique_outcomes,
-            'paramnames': np.array(result.param_names),  # For plotting labels
-            'metadata': {'nsamples': n_samples, 'njobs': n_jobs, 'jobidx': job_idx},
-        }
-
-        file_name = os.path.join(config.OUTPUT_DIR_MC, f"MC_{job_idx:04d}.npy")
-        np.save(file_name, np.array(result_dict, dtype=object))
-        logger.info("MC: job [%s] results saved.", job_idx)
-
-    return result

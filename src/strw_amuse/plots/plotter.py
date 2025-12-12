@@ -12,7 +12,16 @@ import numpy as np
 from amuse.units import units
 from matplotlib.animation import FuncAnimation, PillowWriter
 
-from ..utils.config import OUTPUT_DIR_GIF, OUTPUT_DIR_IMG
+from ..utils.config import (
+    OUTPUT_DIR_GIF,
+    OUTPUT_DIR_IMG,
+    OUTPUT_DIR_SAMPLER,
+    N_DIMS,
+    N_SAMPLES,
+    BOUNDS,
+)
+
+from ..core import sampler
 
 logger = logging.getLogger(__name__)
 
@@ -389,3 +398,108 @@ def plot_corner_marginalized(samples, results, outcome_name="creative_ionized", 
     )
 
     plt.show()
+
+
+def sampler_nd_coverage_plot(
+    samples_np: np.ndarray,
+    samples_sp: np.ndarray,
+    n_samples: int = N_SAMPLES,
+    n_dims: int = N_DIMS,
+    bounds: np.ndarray = BOUNDS,
+    save_dir: str = OUTPUT_DIR_SAMPLER,
+) -> None:
+    """
+    General plotter for sample coverage visualization.
+
+    Args:
+        samples_np (np.ndarray): Uniform samples from `numpy.random.uniform()`.
+        samples_sp (np.ndarray): LHS samples from `scipy.stats.qmc.LatinHyperCube()`
+        n_samples (int, optional): Defaults to N_SAMPLES.
+        n_dims (int, optional): Defaults to N_DIMS.
+        bounds (np.ndarray, optional): Defaults to BOUNDS.
+        save_dir (str, optional): Defaults to OUTPUT_DIR_SAMPLER.
+    """
+
+    # local repo
+    low, high = sampler.nd_bounds(bounds)
+    coverage_np = sampler.nd_coverage(samples_np)
+    coverage_sp = sampler.nd_coverage(samples_sp)
+
+    # fig init
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+
+    # Left: Uniform coverage
+    bars_np = ax1.bar(range(n_dims), coverage_np, color='blue', alpha=0.7, label='Uniform')
+    ax1.axhline(1.0, color='red', ls='--', lw=2, label='Perfect 100%')
+    ax1.set_ylim(0, 1.05)
+    ax1.set_xlabel('Parameter Index')
+    ax1.set_ylabel('Range Coverage')
+    ax1.set_title('Uniform: Coverage')
+    ax1.legend()
+    ax1.grid(True, alpha=0.3)
+
+    # Right: LHS coverage
+    bars_sp = ax2.bar(range(n_dims), coverage_sp, color='green', alpha=0.8, label='LHS')
+    ax2.axhline(1.0, color='red', ls='--', lw=2, label='Perfect 100%')
+    ax2.set_ylim(0, 1.05)
+    ax2.set_xlabel('Parameter Index')
+    ax2.set_ylabel('Range Coverage')
+    ax2.set_title('LHS: Coverage')
+    ax2.legend()
+    ax2.grid(True, alpha=0.3)
+
+    # 1d param converage comparison
+    for i, cov in enumerate(coverage_sp):
+        if cov > 0.99:
+            ax2.text(i, cov + 0.01, '✓', ha='center', va='bottom', fontsize=14, color='red')
+
+    plt.suptitle('Parameter Space Coverage Comparison', fontsize=16)
+    plt.tight_layout()
+    plt.savefig(f'{save_dir}/1d_param_coverage_comparison.png', dpi=150, bbox_inches='tight')
+    plt.close()
+
+    # corner
+    fig_left = plt.figure(figsize=(20, 20))
+    corner.corner(
+        samples_np,
+        fig=fig_left,
+        color='blue',
+        alpha=0.6,
+        labels=[f'p{i}' for i in range(n_dims)],
+        range=[(low[i], high[i]) for i in range(n_dims)],
+        quantiles=[0.25, 0.5, 0.75],
+        smooth=0.05,
+        plot_datapoints=False,
+        plot_density=False,
+    )
+
+    fig_left.suptitle(f'Uniform Corner Plot ({n_samples} samples)', fontsize=16)
+    plt.savefig(f'{save_dir}/uniform.png', dpi=100, bbox_inches='tight')
+    plt.close(fig_left)
+
+    fig_right = plt.figure(figsize=(20, 20))
+    corner.corner(
+        samples_sp,
+        fig=fig_right,
+        color='green',
+        alpha=0.7,
+        labels=[f'p{i}' for i in range(n_dims)],
+        range=[(low[i], high[i]) for i in range(n_dims)],
+        quantiles=[0.25, 0.5, 0.75],
+        smooth=0.05,
+        plot_datapoints=False,
+    )  # SAFE
+
+    fig_right.suptitle(f'LHS Corner Plot ({n_samples} samples)', fontsize=16)
+    plt.savefig(f'{save_dir}/lhs.png', dpi=100, bbox_inches='tight')
+    plt.close(fig_right)
+
+    # Summary stats
+    print("\n" + "=" * 50)
+    print("1D COVERAGE SUMMARY")
+    print("=" * 50)
+    print(f"Uniform sampling avg: {np.mean(coverage_np):.1%} ± {np.std(coverage_np):.1%}")
+    print(f"LHS     sampling avg: {np.mean(coverage_sp):.1%} ± {np.std(coverage_sp):.1%}")
+    print(f"LHS          perfect: {sum(1 for x in coverage_sp if x > 0.99)}/19")
+    print(f"Uniform      perfect: {sum(1 for x in coverage_np if x > 0.99)}/19")
+    print("=" * 50)

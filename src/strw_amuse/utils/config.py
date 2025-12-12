@@ -15,9 +15,39 @@ OUTPUT_DIR_COLLISIONS_DIAGNOSTICS = "./data/collisions_diagnostics"
 OUTPUT_DIR_COLLISIONS_OUTCOMES = "./data/collisions_outcomes"
 OUTPUT_DIR_OUTCOMES = "./data/outcomes"
 OUTPUT_DIR_FINAL_STATES = "./data/final_states"
-OUTPUT_DIR_LOGS = "./data/logs"
 OUTPUT_DIR_SNAPSHOTS = "./media/snapshots"
+OUTPUT_DIR_LOGS = "./data/logs"
 OUTPUT_DIR_MC = "./data/mc"
+OUTPUT_DIR_SAMPLER = './media/img/param'
+# ================================================================================================ #
+
+# configs - example run params
+# ================================================================================================ #
+N_DIMS = 19
+N_SAMPLES = 10000
+BOUNDS = np.array(
+    [
+        [0.00, 0.99],  # ecc 1
+        [0.00, 0.99],  # ecc 2
+        [0.00, 0.99],  # ecc 3
+        [2.00, 7.00],  # sep 1
+        [2.00, 7.00],  # sep 2
+        [2.00, 7.00],  # sep 3
+        [0.10, 1.00],  # v_mag 1
+        [0.10, 1.00],  # v_mag 2
+        [0.00, 5.00],  # impact_parameter 1
+        [0.00, 5.00],  # impact_parameter 2
+        [0.00, np.pi / 2],  # theta 1
+        [0.00, np.pi / 2],  # theta 2
+        [0.00, 2 * np.pi],  # phi 1
+        [0.00, 2 * np.pi],  # phi 2
+        [0.00, 2 * np.pi],  # psi 1
+        [0.00, 2 * np.pi],  # psi 2
+        [0.00, 2 * np.pi],  # true_anomalies 1
+        [0.00, 2 * np.pi],  # true_anomalies 2
+        [0.00, 2 * np.pi],  # true_anomalies 3
+    ]
+)
 # ================================================================================================ #
 
 # configs - example run params

@@ -3,7 +3,7 @@ Example run checker for `run_6body_simulation()`.
 """
 
 from ..plots.plotter import plot_gif, plot_trajectory
-from ..sims.run_simulation import run_6_body_simulation
+from ..sims.run_sim import run_6_body_simulation
 from .config import PARAM_REF, PARAM_TEST
 
 

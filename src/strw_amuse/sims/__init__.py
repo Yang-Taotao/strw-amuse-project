@@ -2,10 +2,9 @@
 strw_amuse.sims package for stellar dynamics simulations project using AMUSE.
 """
 
-from . import mc, monte_carlo, run_simulation
+from . import mc, run_sim
 
 __all__ = [
     'mc',
-    'monte_carlo',
-    'run_simulation',
+    'run_sim',
 ]
