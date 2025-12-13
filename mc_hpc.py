@@ -2,6 +2,14 @@
 Docstring for mc_hpc. Used as main script call for hpc slurm jobs.
 """
 
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API",
+    category=UserWarning,
+)
+
 import logging
 import multiprocessing
 import os

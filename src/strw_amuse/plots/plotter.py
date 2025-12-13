@@ -506,7 +506,7 @@ def corner_for_outcome(
     fig = corner.corner(
         data_to_plot, labels=labels, bins=bins, show_titles=show_titles, title_fmt=title_fmt
     )
-    plt.savefig(fig, f'{save_dir}/corner_outcome.png')
+    plt.savefig(f'{save_dir}/corner_outcome.png')
     plt.close()
 
 
