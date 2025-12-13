@@ -261,144 +261,6 @@ def plot_trajectory(frames, run_label="test"):
     plt.close(fig)
 
 
-def plot_corner_for_outcome(samples, results, outcome_name="creative_ionized"):
-    """
-    Generate a corner plot for all samples that produced the given outcome_name.
-
-    Parameters
-    ----------
-    samples : list of dicts
-        Output of sample_19D_lhs()
-    results : list of (label, weight)
-        Output collected from the parallel pool
-    outcome_name : str
-        Outcome category to filter (e.g., "creative_ionized")
-    """
-
-    # ---- 1. Collect matching sample indices ----
-    indices = [i for i, (label, _) in enumerate(results) if label == outcome_name]
-
-    if len(indices) == 0:
-        logger.warning("No samples with outcome '%s'. Cannot make corner plot.", outcome_name)
-        return
-
-    # ---- 2. Build matrix of parameters ----
-    data = []
-
-    # build list of parameter names in stable order
-    param_order = [
-        "ecc",
-        "sep",
-        "v_mag",
-        "impact_parameter",
-        "theta",
-        "phi",
-        "psi",
-        "true_anomalies",
-    ]
-    # count lengths = 3, 3, 2, 2, 2, 2, 2, 3
-
-    # Construct readable axis labels
-    axis_labels = []
-    for k in param_order:
-        for i in range(len(samples[0][k])):
-            axis_labels.append(f"{k}_{i}")
-
-    # Fill matrix
-    for idx in indices:
-        s = samples[idx]
-        row = []
-        for k in param_order:
-            row.extend(list(s[k]))
-        data.append(row)
-
-    data = np.array(data)
-
-    # ---- 3. Plot ----
-    corner.corner(
-        data,
-        labels=axis_labels,
-        show_titles=True,
-        title_fmt=".2f",
-        quantiles=[0.16, 0.5, 0.84],
-        bins=25,
-    )
-
-    plt.show()
-
-
-def plot_corner_marginalized(samples, results, outcome_name="creative_ionized", param_subset=None):
-    """
-    Generate a corner plot for a subset of parameters, marginalizing over the others.
-
-    Parameters
-    ----------
-    samples : list of dicts
-        Output of sample_19D_lhs() (old format)
-    results : list of (label, weight)
-        Full simulation outcomes and weights
-    outcome_name : str
-        Outcome category to filter (e.g., "creative_ionized")
-    param_subset : list of str
-        List of parameter names to include in the plot (e.g., ["ecc", "sep", "v_mag"])
-        If None, all parameters are included.
-    """
-    # ---- 1. Collect matching sample indices ----
-    indices = [i for i, (label, _) in enumerate(results) if label == outcome_name]
-
-    if len(indices) == 0:
-        logger.warning("No samples with outcome '%s'. Cannot make corner plot.", outcome_name)
-        return
-
-    # Default to all parameters
-    if param_subset is None:
-        param_subset = [
-            "ecc",
-            "sep",
-            "v_mag",
-            "impact_parameter",
-            "theta",
-            "phi",
-            "psi",
-            "true_anomalies",
-        ]
-
-    # ---- 2. Build matrix of parameters ----
-    data = []
-    weights = []
-
-    for idx in indices:
-        s = samples[idx]
-        w = results[idx][1]  # weight
-        row = []
-        for param in param_subset:
-            row.extend(s[param])
-        data.append(row)
-        weights.append(w)
-
-    data = np.array(data)
-    weights = np.array(weights)
-
-    # ---- 3. Build axis labels ----
-    axis_labels = []
-    for param in param_subset:
-        n = len(samples[0][param])
-        for i in range(n):
-            axis_labels.append(f"{param}_{i}")
-
-    # ---- 4. Plot weighted corner plot ----
-    corner.corner(
-        data,
-        labels=axis_labels,
-        show_titles=True,
-        title_fmt=".2f",
-        bins=25,
-        weights=weights,
-    )
-
-    plt.show()
-
-
 def sampler_nd_coverage_plot(
     samples_np: np.ndarray,
     samples_sp: np.ndarray,
@@ -504,7 +366,9 @@ def sampler_nd_coverage_plot(
     print("=" * 50)
 
 
-def plot_cross_section(mc_result, outcome_name, param_groups, n_bins=20, b_max_dict=None):
+def plot_cross_section(
+    mc_result, outcome_name, param_groups, n_bins=20, b_max_dict=None, save_dir=OUTPUT_DIR_IMG
+):
     """
     Plot differential cross-section vs parameters for a given outcome.
 
@@ -526,8 +390,6 @@ def plot_cross_section(mc_result, outcome_name, param_groups, n_bins=20, b_max_d
         Whether to show the plot immediately.
     """
     # Mask stars with desired outcome
-    save_dir = OUTPUT_DIR_IMG
-
     outcome_mask = mc_result.all_star_outcomes['outcome'] == outcome_name
     if not np.any(outcome_mask):
         print(f"No stars produced outcome '{outcome_name}'")
@@ -587,7 +449,13 @@ def plot_cross_section(mc_result, outcome_name, param_groups, n_bins=20, b_max_d
 
 
 def corner_for_outcome(
-    mc_result, outcome_name, param_subset=None, bins=25, title_fmt=".2f", show_titles=True
+    mc_result,
+    outcome_name,
+    param_subset=None,
+    bins=25,
+    title_fmt=".2f",
+    show_titles=True,
+    save_dir=OUTPUT_DIR_IMG,
 ):
     """
     Generate a corner plot for samples that produced a given outcome.
@@ -609,7 +477,6 @@ def corner_for_outcome(
     """
 
     # ---- 1. Identify stars with the desired outcome ----
-    save_dir = OUTPUT_DIR_IMG
     outcome_mask = mc_result.all_star_outcomes['outcome'] == outcome_name
     if not np.any(outcome_mask):
         print(f"No samples produced outcome '{outcome_name}'")
@@ -617,6 +484,7 @@ def corner_for_outcome(
 
     # Map stars back to unique MC sample rows
     sample_rows = np.unique(mc_result.sample_ids[outcome_mask])
+    n_samples_plot = len(sample_rows)
 
     # ---- 2. Select parameters to plot ----
     if param_subset is None:
@@ -628,9 +496,59 @@ def corner_for_outcome(
         data_to_plot = mc_result.samples[sample_rows][:, indices]
         labels = param_subset
 
-    # ---- 3. Make corner plot ----
+    # ---- 3. Check if sufficient data are present ----
+    n_dims = data_to_plot.shape[1]
+    if n_samples_plot < max(10, 2 * n_dims):
+        logger.info("Insufficient data, `corner_for_outcome()` skipped")
+        return None
+
+    # ---- 4. Make corner plot ----
     fig = corner.corner(
         data_to_plot, labels=labels, bins=bins, show_titles=show_titles, title_fmt=title_fmt
     )
-    plt.savefig(f'{save_dir}/corner.png')
+    plt.savefig(f'{save_dir}/corner_outcome.png')
+    plt.close()
+
+
+def plot_velocity_spin_mass(mc_result, outcome_filter=None, save_dir=OUTPUT_DIR_IMG):
+    """
+    Scatter plot: velocity magnitude vs spin, colored by mass.
+
+    Parameters
+    ----------
+    mc_result : MonteCarloResult
+        Output from monte_carlo_19D.
+    outcome_filter : str or list[str], optional
+        Filter for specific outcome types, e.g., "Creative_ionized".
+        If None, all stars are plotted.
+    """
+    data = mc_result.all_star_outcomes
+
+    if data.size == 0:
+        print("No data to plot.")
+        return
+
+    # Apply outcome filter if requested
+    if outcome_filter is not None:
+        if isinstance(outcome_filter, str):
+            outcome_filter = [outcome_filter]
+        mask = np.isin(data['outcome'], outcome_filter)
+        data = data[mask]
+
+    # Extract columns
+    v = data['v_mag']  # km/s
+    spin = data['spin']  # 1/s
+    mass = data['mass_Msun']  # Msun
+
+    plt.figure(figsize=(8, 6))
+    sc = plt.scatter(v, spin, c=mass, cmap='viridis', s=50, edgecolor='k', alpha=0.8)
+    cbar = plt.colorbar(sc)
+    cbar.set_label("Mass [Msun]", fontsize=12)
+
+    plt.xlabel("Velocity magnitude [km/s]", fontsize=12)
+    plt.ylabel("Spin [1/s]", fontsize=12)
+    plt.title("Velocity vs Spin colored by Mass", fontsize=14)
+    plt.grid(True, alpha=0.3)
+    plt.tight_layout()
+    plt.savefig(f'{save_dir}/velocity_spin_mass.png')
     plt.close()

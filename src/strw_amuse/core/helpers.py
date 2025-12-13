@@ -261,9 +261,9 @@ def critical_velocity(masses, sep, ecc):
     mu3 = (m5 * m6) / (m5 + m6)
     # === <<- section in between can be vectorized
 
-    energy_1 = -G * m1 * m2 / (2 * a1 * (1 - e1**2))
-    energy_2 = -G * m3 * m4 / (2 * a2 * (1 - e2**2))
-    energy_3 = -G * m5 * m6 / (2 * a3 * (1 - e3**2))
+    energy_1 = -G * m1 * m2 / (2 * a1)
+    energy_2 = -G * m3 * m4 / (2 * a2)
+    energy_3 = -G * m5 * m6 / (2 * a3)
 
     total_energy = energy_1 + energy_2 + energy_3
     reduced_mass = (mu1 * mu2) / (mu1 + mu2 + mu3)

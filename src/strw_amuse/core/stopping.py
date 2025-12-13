@@ -5,6 +5,7 @@ Stopping condition utilities for 6-body encounter simulation.
 # --- helper functions (local) ---
 import os
 
+import numpy as np
 from amuse.datamodel import Particle, Particles
 from amuse.datamodel.particle_attributes import bound_subset
 
@@ -113,6 +114,8 @@ def outcomes(
     initial_particles,
     final_particles,
     collision_history,
+    spin,
+    v_mag,
     massive_threshold=70 | units.MSun,
     creative_threshold=10 | units.MSun,
     run_label="sim",
@@ -136,6 +139,8 @@ def outcomes(
         Mass above which a remnant is considered massive.
     creative_threshold : quantity
         Mass below which a collision is destructive.
+    spin :
+    v_mag :
     run_label : str
         Label used for output filename.
     output_dir : str
@@ -207,6 +212,8 @@ def outcomes(
                     "outcome": outcome_type,
                     "collisions": ncoll,
                     "mass_Msun": M.value_in(units.MSun),
+                    "spin": spin.value_in(1 / units.s) if spin is not None else np.nan,
+                    "v_mag": v_mag.value_in(units.kms) if v_mag is not None else np.nan,
                     "n_companions": ncomp,
                 }
             )
