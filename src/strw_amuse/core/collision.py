@@ -179,16 +179,21 @@ def run_fi_collision(gas, t_end=0.1 | units.yr, min_mass=1e-6 | units.MSun, run_
     I_cm = (bound_particles.mass * r_rel.lengths() ** 2).sum()
     omega = (L_vec.length() / I_cm).in_(1 / units.s)
 
+    v_com = bound_particles.center_of_mass_velocity()
+    v_mag = v_com.length()
+    M_out = gas_out.total_mass()
+
     # --- Write diagnostics ---
     diag_particle = Particle()
 
     diag_particle.initial_mass = total_mass
     diag_particle.R_scale = length_scale
     diag_particle.N_sph = len(gas)
-    diag_particle.final_mass = gas_out.total_mass()
+    diag_particle.final_mass = M_out
     diag_particle.KE = KE
     diag_particle.PE = PE
     diag_particle.TE = TE
+    diag_particle.v_mag = v_mag
     diag_particle.bound_fraction = bound_fraction
     diag_particle.N_bound = len(bound_particles)
     diag_particle.Lx = L_vec[0]
@@ -205,10 +210,10 @@ def run_fi_collision(gas, t_end=0.1 | units.yr, min_mass=1e-6 | units.MSun, run_
     # )
     # write_set_to_file(diag_particles, diag_filename, "amuse", overwrite_file=True)
 
-    return gas_out
+    return gas_out, omega, v_mag
 
 
-def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""):
+def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, age, run_label=""):
     """
     Handle a single stellar collision using Fi SPH and produce a bound remnant.
     The remnant **replaces one of the colliding particles** in gravity.particles
@@ -227,7 +232,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         colliders = Particles()
         colliders.add_particle(p_i.copy())
         colliders.add_particle(p_j.copy())
-        sph = make_sph_from_two_stars(colliders, n_sph_per_star=500)
+        sph = make_sph_from_two_stars(colliders, n_sph_per_star=1000)
 
         # --- Pre-collision COM and velocity ---
         pre_com_pos = (p_i.mass * p_i.position + p_j.mass * p_j.position) / (p_i.mass + p_j.mass)
@@ -245,7 +250,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         # write_set_to_file(sph, final_filename, "amuse", overwrite_file=True)
 
         # Run Fi
-        gas_out = run_fi_collision(
+        gas_out, spin, v_mag = run_fi_collision(
             sph, t_end=0.1 | units.yr, run_label=f"{run_label}_collision{n_collision}"
         )
         # logger.info("Fi collision done")
@@ -265,7 +270,20 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
 
         bound_particles = gas_out[bound_mask]
         m_bound = bound_particles.total_mass()
-        remnant_radius = (m_bound.value_in(units.MSun) ** 0.57) | units.RSun
+
+        # --- Compute remnant radius from SPH ---
+        r_rel = bound_particles.position - bound_particles.center_of_mass()
+        r_mag = r_rel.lengths()
+
+        sorted_indices = np.argsort(r_mag.value_in(units.RSun))
+        sorted_r = r_mag[sorted_indices]
+        sorted_masses = bound_particles.mass[sorted_indices]
+
+        cum_mass = np.cumsum(sorted_masses.value_in(units.MSun))
+        target_mass = 0.5 * m_bound.value_in(units.MSun)
+
+        idx_radius = np.searchsorted(cum_mass, target_mass)
+        remnant_radius = sorted_r[idx_radius]
 
         # --- Very small remnant → destructive ---
         if m_bound <= (5 | units.MSun):
@@ -301,7 +319,7 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         remnant_seba = Particle()
         remnant_seba.mass = remnant_mass
         remnant_seba.radius = remnant_radius
-        remnant_seba.age = (3.5 | units.Myr) + t
+        remnant_seba.age = age + t
         seba.particles.add_particle(remnant_seba)
         seba.recommit_particles()
 
@@ -316,12 +334,12 @@ def collision(key_i, key_j, n_collision, gravity, seba, key_map, t, run_label=""
         #     key_j,
         # )
 
-        return True, p_i
+        return True, p_i, spin, v_mag
 
     except Exception:
         # Log full traceback for debugging; do not silently swallow exceptions
         # logger.exception("Collision handling failed for keys %s,%s", key_i, key_j)
-        return False, None
+        return False, None, None
 
 
 def remove_colliders(gravity, seba, key_map, keys):

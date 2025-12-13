@@ -18,6 +18,7 @@ def visualize(
     Wrapper function for visualizing MC run results.
     - Call `plotter.plot_cross_section()`
     - Call `plotter.corner_for_outcome()`
+    - Call `plotter.plot_velocity_spin_mass()`
 
     Args:
         file_path (str): File path to MC results `.npz` file.
@@ -44,4 +45,5 @@ def visualize(
         param_subset=param_subset,
         bins=n_bins,
     )
+    plotter.plot_velocity_spin_mass(mc_result=data_result, outcome_filter=outcome_name)
     return None

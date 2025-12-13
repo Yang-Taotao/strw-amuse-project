@@ -138,11 +138,15 @@ def run_6_body_simulation(
         g.radius = s.radius
 
     start = time.time()
-    max_time = 20 * 60
+    max_time = 1800
     gravity.stopping_conditions.collision_detection.enable()
 
     collision_history = []
-    check_every = 10 | units.yr
+    check_every = 50 | units.yr
+
+    spin_remnant = None
+    v_mag_remnant = None
+
     # Main evolution loop
     while t < t_end:
         if time.time() - start > max_time:
@@ -178,10 +182,12 @@ def run_6_body_simulation(
             #     key_j,
             # )
 
-            success, remnant = collision(
-                key_i, key_j, n_collision, gravity, seba, key_map, t, run_label
+            success, remnant, spin, v_magnitude = collision(
+                key_i, key_j, n_collision, gravity, seba, key_map, t, target_age, run_label
             )
             if success:
+                spin_remnant = spin
+                v_mag_remnant = v_magnitude
                 n_collision += 1
                 frames.append(gravity.particles.copy())
 
@@ -235,7 +241,12 @@ def run_6_body_simulation(
                     gravity.stop()
                     seba.stop()
                     outcome = outcomes(
-                        initial_particles, final_particles, collision_history, run_label=run_label
+                        initial_particles,
+                        final_particles,
+                        collision_history,
+                        spin_remnant,
+                        v_mag_remnant,
+                        run_label=run_label,
                     )
                     # final_filename = os.path.join(
                     #     OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
@@ -277,7 +288,12 @@ def run_6_body_simulation(
                 gravity.stop()
                 seba.stop()
                 outcome = outcomes(
-                    initial_particles, final_particles, collision_history, run_label=run_label
+                    initial_particles,
+                    final_particles,
+                    collision_history,
+                    spin_remnant,
+                    v_mag_remnant,
+                    run_label=run_label,
                 )
                 # final_filename = os.path.join(
                 #     OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
@@ -327,7 +343,12 @@ def run_6_body_simulation(
                     gravity.stop()
                     seba.stop()
                     outcome = outcomes(
-                        initial_particles, final_particles, collision_history, run_label=run_label
+                        initial_particles,
+                        final_particles,
+                        collision_history,
+                        spin_remnant,
+                        v_mag_remnant,
+                        run_label=run_label,
                     )
                     # final_filename = os.path.join(
                     #     OUTPUT_DIR_FINAL_STATES, f"final_system_{run_label}.amuse"
@@ -336,3 +357,18 @@ def run_6_body_simulation(
                     #     final_particles, final_filename, "amuse", overwrite_file=True
                     # )
                     return frames, outcome
+
+    # ---- END OF SIMULATION: normal termination ----
+    final_particles = gravity.particles.copy()
+    gravity.stop()
+    seba.stop()
+    outcome = outcomes(
+        initial_particles,
+        final_particles,
+        collision_history,
+        spin_remnant,
+        v_mag_remnant,
+        run_label=run_label,
+    )
+
+    return frames, outcome

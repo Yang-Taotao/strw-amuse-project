@@ -5,20 +5,11 @@ Docstring for mc_hpc. Used as main script call for hpc slurm jobs.
 import logging
 import multiprocessing
 import os
-import warnings
 
 from src.strw_amuse.sims import mc
 from src.strw_amuse.utils import logger
 
 if __name__ == "__main__":
-
-    # supress AMUSE `pkg_resources` warning
-    warnings.filterwarnings(
-        "ignore",
-        message="pkg_resources is deprecated as an API",
-        category=UserWarning,
-    )
-
     # logger init
     logger.setup_logging()
     logs = logging.getLogger(__name__)

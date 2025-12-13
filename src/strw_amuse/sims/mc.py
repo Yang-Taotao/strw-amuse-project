@@ -3,6 +3,14 @@ Monte Carlo utilities for cross section calculation.
 Uses 19D LHS samples from src.strw_amuse.core.sampler and runs 6-body sims.
 """
 
+import warnings
+
+warnings.filterwarnings(
+    "ignore",
+    message="pkg_resources is deprecated as an API",
+    category=UserWarning,
+)
+
 import logging
 import os
 from multiprocessing import Pool, cpu_count
@@ -112,6 +120,8 @@ def _monte_carlo_core(
                     s["collisions"],
                     s["n_companions"],
                     s["mass_Msun"],
+                    s["spin"],
+                    s["v_mag"],
                     s["outcome"],
                 )
             )
@@ -123,6 +133,8 @@ def _monte_carlo_core(
         ("collisions", "int32"),
         ("n_companions", "int32"),
         ("mass_Msun", "float64"),
+        ("spin", "float64"),
+        ("v_mag", "float64"),
         ("outcome", "U32"),
     ]
 

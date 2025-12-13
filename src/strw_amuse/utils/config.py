@@ -5,7 +5,6 @@ Configuation file for the STRW-AMUSE project.
 """
 
 from dataclasses import dataclass
-
 import numpy as np
 
 # configs - dir
@@ -33,13 +32,13 @@ BOUNDS = np.array(
         [0.00, 0.99],  # ecc 1
         [0.00, 0.99],  # ecc 2
         [0.00, 0.99],  # ecc 3
-        [2.00, 7.00],  # sep 1
-        [2.00, 7.00],  # sep 2
-        [2.00, 7.00],  # sep 3
-        [0.10, 1.00],  # v_mag 1
-        [0.10, 1.00],  # v_mag 2
-        [0.00, 5.00],  # impact_parameter 1
-        [0.00, 5.00],  # impact_parameter 2
+        [1.50, 7.00],  # sep 1
+        [1.50, 7.00],  # sep 2
+        [1.50, 7.00],  # sep 3
+        [0.10, 5.00],  # v_mag 1
+        [0.10, 5.00],  # v_mag 2
+        [0.00, 10.00],  # impact_parameter 1
+        [0.00, 10.00],  # impact_parameter 2
         [0.00, np.pi / 2],  # theta 1
         [0.00, np.pi / 2],  # theta 2
         [0.00, 2 * np.pi],  # phi 1
