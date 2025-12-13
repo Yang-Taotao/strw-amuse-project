@@ -4,8 +4,8 @@ Stopping condition utilities for 6-body encounter simulation.
 
 # --- helper functions (local) ---
 import os
-import numpy as np
 
+import numpy as np
 from amuse.datamodel import Particle, Particles
 from amuse.datamodel.particle_attributes import bound_subset
 

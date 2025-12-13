@@ -379,7 +379,8 @@ def plot_cross_section(
     outcome_name : str
         Outcome to compute cross-section for (e.g., "Creative_ionized").
     param_groups : dict
-        Keys are plot titles / labels (e.g., "ecc") and values are lists of parameter names to marginalize over.
+        Keys are plot titles / labels (e.g., "ecc")
+            values are lists of parameter names to marginalize over.
         Example: {"ecc": ["ecc_0","ecc_1","ecc_2"], "sep": ["sep_0","sep_1","sep_2"]}
     n_bins : int
         Number of bins per parameter group.
@@ -498,14 +499,14 @@ def corner_for_outcome(
     # ---- 3. Check if sufficient data are present ----
     n_dims = data_to_plot.shape[1]
     if n_samples_plot < max(10, 2 * n_dims):
-        logger.info(f"Insufficient data, `corner_for_outcome()` skipped")
+        logger.info("Insufficient data, `corner_for_outcome()` skipped")
         return None
 
     # ---- 4. Make corner plot ----
     fig = corner.corner(
         data_to_plot, labels=labels, bins=bins, show_titles=show_titles, title_fmt=title_fmt
     )
-    plt.savefig(f'{save_dir}/corner_outcome.png')
+    plt.savefig(fig, f'{save_dir}/corner_outcome.png')
     plt.close()
 
 

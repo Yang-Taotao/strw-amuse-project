@@ -3,10 +3,10 @@ Main script for running the 6-body encounter simulation and visualization.
 """
 
 import multiprocessing
-from src.strw_amuse.sims import mc
-from src.strw_amuse.utils import logger
 
 from src.strw_amuse.plots import visualization
+from src.strw_amuse.sims import mc
+from src.strw_amuse.utils import logger
 
 if __name__ == "__main__":
     # init logger
