@@ -48,3 +48,4 @@ dependencies:
   - flake8
   - black
   - isort
+  - scienceplots

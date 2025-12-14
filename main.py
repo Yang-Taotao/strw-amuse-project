@@ -29,13 +29,13 @@ if __name__ == "__main__":
     result = mc.monte_carlo_19D(n_samples=10, n_workers=10)
 
     # local repo
-    dir_path = "./data/mc/"
-    file_path = "./data/mc/mc_result_combined.npz"
+    dir_path = "./mc/mc"
+    file_path = "./mc/mc/mc_result_combined.npz"
     outcome_name = "Creative_ionized"
-    n_bins = 10
+    n_bins = 500
 
     # combine all mc results into singular file
-    convert.to_one_npz(dir_path=dir_path, file_path=file_path)
+    # convert.to_one_npz(dir_path=dir_path, file_path=file_path)
 
     # visualiza mc results
     visualization.visualize(file_path=file_path, outcome_name=outcome_name, n_bins=n_bins)

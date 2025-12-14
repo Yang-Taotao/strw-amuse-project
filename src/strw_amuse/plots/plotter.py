@@ -6,8 +6,10 @@ import logging
 import os
 
 import corner
-import matplotlib.colors as mcolors
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import scienceplots
+import matplotlib.colors as mcolors
 import numpy as np
 from amuse.units import units
 from matplotlib.animation import FuncAnimation, PillowWriter
@@ -23,6 +25,9 @@ from ..utils.config import (
 )
 
 logger = logging.getLogger(__name__)
+
+mpl.rcParams["text.usetex"] = False
+plt.style.use(['science', 'nature', 'no-latex'])
 
 
 def plot_gif(frames, run_label="test", massive_threshold=70.0):
@@ -76,7 +81,7 @@ def plot_gif(frames, run_label="test", massive_threshold=70.0):
 
     # --- Gather all masses for color mapping ---
     all_masses = np.array([p.mass.value_in(units.MSun) for f in frames for p in f])
-    cmap = plt.get_cmap("plasma")
+    cmap = plt.get_cmap("inferno")
     norm = mcolors.Normalize(vmin=all_masses.min(), vmax=all_masses.max())
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 
@@ -176,7 +181,7 @@ def plot_trajectory(frames, run_label="test"):
     # Build colormap for masses
     # ---------------------------------------------------------
     all_masses = np.array([p.mass.value_in(units.MSun) for f in frames for p in f])
-    cmap = plt.get_cmap("plasma")
+    cmap = plt.get_cmap("inferno")
     norm = mcolors.Normalize(vmin=all_masses.min(), vmax=all_masses.max())
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 
@@ -399,7 +404,12 @@ def plot_cross_section(
     sample_ids = mc_result.sample_ids[outcome_mask]
 
     n_plots = len(param_groups)
-    plt.figure(figsize=(5 * n_plots, 4))
+
+    cmap = plt.get_cmap("inferno")
+    band_color = cmap(0.7)
+    point_color = cmap(0.1)
+
+    plt.figure(figsize=(8 * n_plots, 6))
 
     for i, (group_name, param_names) in enumerate(param_groups.items(), start=1):
         # Collect all parameter values for the group
@@ -435,24 +445,65 @@ def plot_cross_section(
             sigma_binned[j] = area * np.sum(w_bin)
             sigma_err[j] = area * np.sqrt(np.sum(w_bin**2))
 
+        # # Plot
+        # ax = plt.subplot(1, n_plots, i)
+        # ax.errorbar(b_centers, sigma_binned, yerr=sigma_err, fmt='o', capsize=3, color='C0')
+        # ax.plot(b_centers, sigma_binned, '-', color='C0')
+        # ax.set_xlabel(group_name)
+        # ax.set_ylabel(r"$\sigma_\mathrm{ionized}$ [AU$^2$]")
+        # ax.grid(True)
+
         # Plot
         ax = plt.subplot(1, n_plots, i)
-        ax.errorbar(b_centers, sigma_binned, yerr=sigma_err, fmt='o', capsize=3, color='C0')
-        ax.plot(b_centers, sigma_binned, '-', color='C0')
-        ax.set_xlabel(group_name)
-        ax.set_ylabel(r"$\sigma_\mathrm{ionized}$ [AU$^2$]")
-        ax.grid(True)
+
+        # 1) Error band (semi-transparent)
+        upper = sigma_binned + sigma_err
+        lower = sigma_binned - sigma_err
+        lower = np.clip(lower, 0.0, None)  # avoid negative cross-sections
+
+        ax.fill_between(
+            b_centers,
+            lower,
+            upper,
+            color=band_color,
+            alpha=0.5,
+            linewidth=0,
+            zorder=1,
+            label="uncertainty",
+        )
+
+        ax.plot(b_centers, upper, color=band_color, alpha=0.5, linewidth=0.5)
+        ax.plot(b_centers, lower, color=band_color, alpha=0.5, linewidth=0.5)
+
+        # 2) Points only (no connecting line, smaller markers)
+        ax.scatter(
+            b_centers,
+            sigma_binned,
+            s=24,
+            color=point_color,
+            edgecolors="none",
+            zorder=3,
+            label="binned cross-section",
+        )
+
+        ax.set_xlabel(group_name, fontsize=14)
+        ax.set_ylabel(r"$\sigma_\mathrm{ionized}\left(\text{AU}^2\right)$", fontsize=14)
+
+        # Optional: show legend only once or on each subplot
+        if i == 1:
+            ax.legend(fontsize=8)
 
     plt.tight_layout()
     plt.savefig(f'{save_dir}/cross_section.png')
     plt.close()
+    logger.info("VIS: `plot_cross_section()` finished.")
 
 
 def corner_for_outcome(
     mc_result,
     outcome_name,
     param_subset=None,
-    bins=25,
+    bins=20,
     title_fmt=".2f",
     show_titles=True,
     save_dir=OUTPUT_DIR_IMG,
@@ -499,15 +550,34 @@ def corner_for_outcome(
     # ---- 3. Check if sufficient data are present ----
     n_dims = data_to_plot.shape[1]
     if n_samples_plot < max(10, 2 * n_dims):
-        logger.info("Insufficient data, `corner_for_outcome()` skipped")
+        logger.info("VIS: Insufficient data, `corner_for_outcome()` skipped")
         return None
 
     # ---- 4. Make corner plot ----
+    cmap = plt.get_cmap("inferno")
+    color = cmap(0.0)
+    label_kwargs = {"fontsize": 16}
+    title_kwargs = {"fontsize": 18}
+    hist_kwargs = {"color": color}
+
     fig = corner.corner(
-        data_to_plot, labels=labels, bins=bins, show_titles=show_titles, title_fmt=title_fmt
+        data_to_plot,
+        labels=labels,
+        bins=bins,
+        show_titles=show_titles,
+        title_fmt=title_fmt,
+        color=color,
+        plot_datapoints=True,
+        plot_contours=True,
+        plot_density=True,
+        fill_contours=True,
+        label_kwargs=label_kwargs,
+        title_kwargs=title_kwargs,
+        hist_kwargs=hist_kwargs,
     )
-    plt.savefig(f'{save_dir}/corner_outcome.png')
-    plt.close()
+    fig.savefig(f'{save_dir}/corner_outcome.png')
+    plt.close(fig)
+    logger.info("VIS: `corner_for_outcome()` finished.")
 
 
 def plot_velocity_spin_mass(mc_result, outcome_filter=None, save_dir=OUTPUT_DIR_IMG):
@@ -540,15 +610,35 @@ def plot_velocity_spin_mass(mc_result, outcome_filter=None, save_dir=OUTPUT_DIR_
     spin = data['spin']  # 1/s
     mass = data['mass_Msun']  # Msun
 
-    plt.figure(figsize=(8, 6))
-    sc = plt.scatter(v, spin, c=mass, cmap='viridis', s=50, edgecolor='k', alpha=0.8)
-    cbar = plt.colorbar(sc)
-    cbar.set_label("Mass [Msun]", fontsize=12)
+    fig, ax = plt.subplots(figsize=(8, 6))
+    sc = ax.scatter(v, spin, c=mass, cmap='inferno', s=10, edgecolor='none', alpha=0.8)
+    cbar = plt.colorbar(sc, ax=ax)
+    cbar.set_label(r"Mass $\left(M_{\odot}\right)$", fontsize=14)
 
-    plt.xlabel("Velocity magnitude [km/s]", fontsize=12)
-    plt.ylabel("Spin [1/s]", fontsize=12)
-    plt.title("Velocity vs Spin colored by Mass", fontsize=14)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(f'{save_dir}/velocity_spin_mass.png')
-    plt.close()
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+
+    ax.set_xlabel(r"Velocity magnitude $\left(\text{km}\cdot\text{s}^{-1}\right)$", fontsize=14)
+    ax.set_ylabel(r"Spin $\left(\text{s}^{-1}\right)$", fontsize=14)
+
+    ax.text(
+        0.95,
+        0.95,
+        f"Total Plotted = {len(v)}",
+        transform=ax.transAxes,
+        ha="right",
+        va="center",
+        fontsize=10,
+        bbox=dict(
+            boxstyle="round",  # or "square", "round,pad=0.2", etc.
+            facecolor="white",
+            edgecolor="black",
+            alpha=0.8,
+            linewidth=1.0,
+        ),
+    )
+
+    fig.tight_layout()
+    fig.savefig(f'{save_dir}/velocity_spin_mass.png')
+    plt.close(fig)
+    logger.info("VIS: `plot_velocity_spin_mass()` finished.")

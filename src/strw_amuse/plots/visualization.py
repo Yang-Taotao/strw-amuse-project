@@ -12,7 +12,7 @@ def visualize(
     outcome_name: str,
     param_groups: dict = PARAM_CROSS_SECTION,
     param_subset: list = PARAM_CORNER,
-    n_bins: int = 10,
+    n_bins: int = 100,
 ) -> None:
     """
     Wrapper function for visualizing MC run results.
@@ -43,7 +43,6 @@ def visualize(
         mc_result=data_result,
         outcome_name=outcome_name,
         param_subset=param_subset,
-        bins=n_bins,
     )
     plotter.plot_velocity_spin_mass(mc_result=data_result, outcome_filter=outcome_name)
     return None
