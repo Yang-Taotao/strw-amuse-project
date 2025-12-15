@@ -16,6 +16,7 @@ This is the README document for strw-amuse-project, a project for the 2025 [***S
     - [Some interesting questions](#some-interesting-questions)
   - [Example](#example)
   - [Example plots](#example-plots)
+  - [Flowchart](#flowchart)
   - [Archived](#archived)
     - [Steps](#steps)
     - [Configs](#configs)
@@ -236,11 +237,16 @@ At some Monte Carlo run performed with a prior version of the project code base,
 | Plot | Description |
 |------|-------------|
 | ![ref case](./media/gif/encounter_evolution_ref_case.gif) | Refrencase case of binary-binary-binary interaction. |
-| ![test case](./media/gif/encounter_evolution_test_case.gif) | Test case of binary-binary-binary interaction with creative ionized outcome. |
-| ![param uniform](./media/img/param/uniform.png) | Uniform sampler param space coverage |
-| ![param lhs](./media/img/param/lhs.png) | Latin Hypercube sampler param space coverage |
+| ![test case](./media/gif/encounter_evolution_test_case.gif) | Test case of binary-binary-binary interaction with creative bound (left side) and creative ionized (right side) outcome. |
+| ![param uniform](./media/img/param/uniform.png) | Uniform sampler param space coverage for `n_samples = 10000` |
+| ![param lhs](./media/img/param/lhs.png) | Latin Hypercube sampler param space coverage for `n_samples = 10000` |
 | ![param coverage comp](./media/img/param/1d_param_coverage_comparison.png) | Param coverage 1-d comparison |
-| ![Cross section](media/img/cross_section.png) | Cross section dependency over selective parameters |
+| ![cross section](media/img/cross_section.png) | Cross section dependency over selective parameters |
+| ![corner outcome](media/img/corner_outcome.png) | Corner plot of mc run outcomes with seletive param |
+
+## Flowchart
+
+![flowchat](media/img/flowchart.png)
 
 ---
 
