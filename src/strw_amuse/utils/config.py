@@ -58,10 +58,13 @@ BOUNDS: Final = np.array(
 # configs - Plotter param selection
 # ================================================================================================ #
 PARAM_CROSS_SECTION: Final = {
-    r"impact parameter $\left(\mathrm{AU}\right)$": ["impact_parameter_0", "impact_parameter_1"],
-    "eccentricity": ["ecc_0", "ecc_1", "ecc_2"],
-    r"separation $\left(\mathrm{AU}\right)$": ["sep_0", "sep_1", "sep_2"],
-    "v_mag": ["v_mag_0", "v_mag_1"],
+    r"impact parameter $\rho \left(\mathrm{AU}\right)$": [
+        "impact_parameter_0",
+        "impact_parameter_1",
+    ],
+    r"eccentricity $e$": ["ecc_0", "ecc_1", "ecc_2"],
+    r"separation $a \left(\mathrm{AU}\right)$": ["sep_0", "sep_1", "sep_2"],
+    r"$v_\text{mag}$": ["v_mag_0", "v_mag_1"],
 }
 PARAM_CORNER: Final = [
     "ecc_0",
