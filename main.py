@@ -26,7 +26,7 @@ if __name__ == "__main__":
     multiprocessing.set_start_method("spawn", force=True)
 
     # get mc results
-    result = mc.monte_carlo_19D(n_samples=10, n_workers=10)
+    # result = mc.monte_carlo_19D(n_samples=10, n_workers=10)
 
     # local repo
     dir_path = "./mc/mc"

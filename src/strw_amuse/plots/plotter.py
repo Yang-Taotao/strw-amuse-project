@@ -295,7 +295,7 @@ def sampler_nd_coverage_plot(
     sp_color = cmap(0.3)
 
     # fig init
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 3))
 
     # Left: Uniform coverage
     bars_np = ax1.bar(range(n_dims), coverage_np, color=np_color, alpha=0.7, label='Uniform')
@@ -320,46 +320,49 @@ def sampler_nd_coverage_plot(
     # 1d param converage comparison
     for i, cov in enumerate(coverage_sp):
         if cov > 0.99:
-            ax2.text(i, cov + 0.01, '✓', ha='center', va='bottom', fontsize=14, color='red')
+            ax2.text(i, cov + 0.01, '✓', ha='center', va='bottom', color='red')
 
-    fig.suptitle('Parameter Space Coverage Comparison', fontsize=16)
+    fig.suptitle('Parameter Space Coverage Comparison')
     plt.tight_layout()
-    fig.savefig(f'{save_dir}/1d_param_coverage_comparison.png', dpi=150, bbox_inches='tight')
+    fig.savefig(f'{save_dir}/1d_param_coverage_comparison.png', dpi=300, bbox_inches='tight')
     plt.close()
 
     # corner
-    fig_left = plt.figure(figsize=(10, 10))
+    fig_left = plt.figure(figsize=(8, 8))
     corner.corner(
         samples_np,
         fig=fig_left,
         color=np_color,
         alpha=0.7,
-        labels=[f'p{i}' for i in range(n_dims)],
-        range=[(low[i], high[i]) for i in range(n_dims)],
-        quantiles=[0.25, 0.5, 0.75],
+        n_bins=20,
+        labels=[f'p_{i}' for i in range(n_dims)],
         smooth=0.05,
         plot_datapoints=False,
-        plot_density=False,
     )
 
-    fig_left.suptitle(f'Uniform Corner Plot ({n_samples} samples)', fontsize=18)
+    fig_left.suptitle(f'Uniform Sampling: {n_samples} samples', fontsize=16)
+    for ax in fig_left.get_axes():
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
     plt.savefig(f'{save_dir}/uniform.png', dpi=300, bbox_inches='tight')
     plt.close(fig_left)
 
-    fig_right = plt.figure(figsize=(10, 10))
+    fig_right = plt.figure(figsize=(8, 8))
     corner.corner(
         samples_sp,
         fig=fig_right,
         color=sp_color,
         alpha=0.7,
-        labels=[f'p{i}' for i in range(n_dims)],
-        range=[(low[i], high[i]) for i in range(n_dims)],
-        quantiles=[0.25, 0.5, 0.75],
+        n_bins=20,
+        labels=[f'p_{i}' for i in range(n_dims)],
         smooth=0.05,
         plot_datapoints=False,
     )
 
-    fig_right.suptitle(f'LHS Corner Plot ({n_samples} samples)', fontsize=18)
+    fig_right.suptitle(f'Latin Hypercube Sampling: {n_samples} samples', fontsize=16)
+    for ax in fig_right.get_axes():
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
     plt.savefig(f'{save_dir}/lhs.png', dpi=300, bbox_inches='tight')
     plt.close(fig_right)
 
@@ -414,7 +417,7 @@ def plot_cross_section(
     band_color = cmap(0.7)
     point_color = cmap(0.3)
 
-    plt.figure(figsize=(8 * n_col, 6 * n_row))
+    plt.figure(figsize=(4 * n_col, 3 * n_row))
 
     for i, (group_name, param_names) in enumerate(param_groups.items(), start=1):
         # Collect all parameter values for the group
@@ -466,7 +469,7 @@ def plot_cross_section(
             alpha=0.5,
             linewidth=0,
             zorder=1,
-            label="uncertainty",
+            label="Uncertainty",
         )
 
         ax.plot(b_centers, upper, color=band_color, alpha=0.5, linewidth=0.5)
@@ -476,21 +479,22 @@ def plot_cross_section(
         ax.scatter(
             b_centers,
             sigma_binned,
-            s=24,
+            s=3,
             color=point_color,
-            edgecolors="none",
+            edgecolors="k",
+            linewidths=0.1,
             zorder=3,
-            label="binned cross-section",
+            label="Cross section",
         )
 
         ax.set_xlabel(group_name, fontsize=14)
-        ax.set_ylabel(r"$\sigma_\mathrm{ionized}\left(\mathrm{AU}^2\right)$", fontsize=14)
+        ax.set_ylabel(r"$\sigma_\mathrm{ionized} ~\left(\mathrm{AU}^2\right)$", fontsize=14)
 
         ax.set_yscale("log")
 
         # Optional: show legend only once or on each subplot
         if i == 1:
-            ax.legend(fontsize=12)
+            ax.legend(fontsize=8)
 
     plt.tight_layout()
     plt.savefig(f'{save_dir}/cross_section.png', dpi=300)
@@ -539,12 +543,26 @@ def corner_for_outcome(
     # ---- 2. Select parameters to plot ----
     if param_subset is None:
         data_to_plot = mc_result.samples[sample_rows, :]
-        labels = mc_result.param_names
+        label = mc_result.param_names
     else:
         # Find indices of selected parameters
         indices = [mc_result.param_names.index(p) for p in param_subset]
         data_to_plot = mc_result.samples[sample_rows][:, indices]
-        labels = param_subset
+        label = param_subset
+
+    label_dict = {
+        "ecc_0": r"$e_0$",
+        "ecc_1": r"$e_1$",
+        "ecc_2": r"$e_1$",
+        "sep_0": r"$\mathrm{sep}_0$",
+        "sep_1": r"$\mathrm{sep}_1$",
+        "sep_2": r"$\mathrm{sep}_2$",
+        "impact_parameter_0": r"$\rho_0$",
+        "impact_parameter_1": r"$\rho_1$",
+        "v_mag_0": r"${\mathrm{v}_\mathrm{mag}}_0$",
+        "v_mag_1": r"${\mathrm{v}_\mathrm{mag}}_1$",
+    }
+    labels = [label_dict.get(name, name) for name in label]
 
     # ---- 3. Check if sufficient data are present ----
     n_dims = data_to_plot.shape[1]
@@ -556,14 +574,15 @@ def corner_for_outcome(
     cmap = plt.get_cmap("viridis")
     color = cmap(0.3)
 
-    fig = plt.figure(figsize=(10, 10))
+    fig = plt.figure(figsize=(8, 8))
 
-    label_kwargs = {"fontsize": 16}
-    title_kwargs = {"fontsize": 18}
+    label_kwargs = {"fontsize": 12}
+    title_kwargs = {"fontsize": 10}
     hist_kwargs = {"color": color}
 
-    fig = corner.corner(
+    corner.corner(
         data_to_plot,
+        fig=fig,
         labels=labels,
         bins=bins,
         show_titles=show_titles,
@@ -577,6 +596,13 @@ def corner_for_outcome(
         title_kwargs=title_kwargs,
         hist_kwargs=hist_kwargs,
     )
+
+    for ax in fig.get_axes():
+        # Rotate x tick labels
+        for label in ax.get_xticklabels():
+            label.set_rotation(45)
+            label.set_horizontalalignment('right')
+
     fig.savefig(f'{save_dir}/corner_outcome.png', dpi=300)
     plt.close(fig)
     logger.info("VIS: `corner_for_outcome()` finished.")
@@ -612,31 +638,30 @@ def plot_velocity_spin_mass(mc_result, outcome_filter=None, save_dir=OUTPUT_DIR_
     spin = data['spin']  # 1/s
     mass = data['mass_Msun']  # Msun
 
-    fig, ax = plt.subplots(figsize=(8, 6))
-    sc = ax.scatter(v, spin, c=mass, cmap='viridis', s=10, edgecolor='none', alpha=0.8)
+    fig, ax = plt.subplots(figsize=(4, 3))
+    sc = ax.scatter(v, spin, c=mass, cmap='viridis', s=2, edgecolor='k', linewidths=0.1, alpha=0.8)
     cbar = plt.colorbar(sc, ax=ax)
-    cbar.set_label(r"Mass $\left(M_{\odot}\right)$", fontsize=14)
+    cbar.set_label(r"Mass $\left(M_{\odot}\right)$")
 
     ax.set_xscale("log")
     ax.set_yscale("log")
 
-    ax.set_xlabel(r"Velocity magnitude $\left(\text{km}~\text{s}^{-1}\right)$", fontsize=14)
-    ax.set_ylabel(r"Spin $\left(\text{s}^{-1}\right)$", fontsize=14)
+    ax.set_xlabel(r"$\mathrm{v}_\mathrm{mag} ~\left(\mathrm{km}~\mathrm{s}^{-1}\right)$")
+    ax.set_ylabel(r"$s ~\left(\mathrm{s}^{-1}\right)$")
 
     ax.text(
         0.95,
         0.95,
-        f"Total Plotted = {len(v)}",
+        f"Number of Points = {len(v)}",
         transform=ax.transAxes,
         ha="right",
         va="center",
-        fontsize=10,
         bbox=dict(
-            boxstyle="round",  # or "square", "round,pad=0.2", etc.
+            boxstyle="square",
             facecolor="white",
             edgecolor="black",
             alpha=0.8,
-            linewidth=1.0,
+            linewidth=0.2,
         ),
     )
 
