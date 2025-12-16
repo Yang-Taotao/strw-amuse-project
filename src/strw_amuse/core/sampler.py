@@ -2,8 +2,7 @@
 MC sampler test script.
 """
 
-import os
-
+from pathlib import Path
 import numpy as np
 from scipy.stats.qmc import LatinHypercube
 
@@ -20,7 +19,7 @@ def gen_nd_samples(
     n_samples: int = N_SAMPLES,
     n_dims: int = N_DIMS,
     bounds: np.ndarray = BOUNDS,
-    save_dir: str = OUTPUT_DIR_SAMPLER,
+    save_dir: Path = OUTPUT_DIR_SAMPLER,
     seed: int = SEED,
 ) -> tuple[np.ndarray, np.ndarray]:
     """
@@ -32,13 +31,13 @@ def gen_nd_samples(
         n_samples (int, optional): Defaults to N_SAMPLES.
         n_dims (int, optional): Defaults to N_DIMS.
         bounds (np.ndarray, optional): Defaults to BOUNDS.
-        save_dir (str, optional): Defaults to OUTPUT_DIR_SAMPLER.
+        save_dir (Path, optional): Defaults to OUTPUT_DIR_SAMPLER.
 
     Returns:
         tuple[np.ndarray, np.ndarray]: Samples (Uniform), Samples (LHS)
     """
     # init
-    os.makedirs(save_dir, exist_ok=True)
+    save_dir.mkdir(exist_ok=True)
 
     # local repo
     low, high = nd_bounds(bounds)

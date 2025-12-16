@@ -2,14 +2,11 @@
 Stopping condition utilities for 6-body encounter simulation.
 """
 
-# --- helper functions (local) ---
-import os
-
+from pathlib import Path
 import numpy as np
 from amuse.datamodel import Particle, Particles
 from amuse.datamodel.particle_attributes import bound_subset
 
-# from amuse.io import write_set_to_file
 from amuse.units import constants, units
 
 from ..utils.config import OUTPUT_DIR_COLLISIONS_OUTCOMES
@@ -119,7 +116,7 @@ def outcomes(
     massive_threshold=70 | units.MSun,
     creative_threshold=10 | units.MSun,
     run_label="sim",
-    output_dir=OUTPUT_DIR_COLLISIONS_OUTCOMES,
+    output_dir: Path = OUTPUT_DIR_COLLISIONS_OUTCOMES,
 ):
     """
     Compute and save outcomes for each final star using explicit collision mapping.
@@ -143,7 +140,7 @@ def outcomes(
     v_mag :
     run_label : str
         Label used for output filename.
-    output_dir : str
+    output_dir : Path
         Directory to save outcomes AMUSE file.
 
     Returns:
@@ -152,8 +149,7 @@ def outcomes(
         Stars that participated in exactly 1 collision.
     """
 
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir, exist_ok=True)
+    output_dir.mkdir(parents=True, exist_ok=True)
 
     if isinstance(final_particles, list):
         final_particles = Particles(final_particles)

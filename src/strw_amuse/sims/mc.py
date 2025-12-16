@@ -12,7 +12,7 @@ warnings.filterwarnings(
 )
 
 import logging
-import os
+from pathlib import Path
 from multiprocessing import Pool, cpu_count
 
 import numpy as np
@@ -177,6 +177,7 @@ def monte_carlo_19D(
     n_workers: int | None = None,
     save: bool = True,
     seed: int = SEED,
+    save_dir: Path = OUTPUT_DIR_MC,
 ) -> MonteCarloResult:
     """
     Monte Carlo 19D simulation for one job segment using sampler.gen_nd_samples.
@@ -205,8 +206,8 @@ def monte_carlo_19D(
     result = _monte_carlo_core(samples, verbose=verbose, n_workers=n_workers)
 
     if save:
-        os.makedirs(OUTPUT_DIR_MC, exist_ok=True)
-        out_path = os.path.join(OUTPUT_DIR_MC, f"mc_result_{job_idx:04d}.npz")
+        save_dir.mkdir(parents=True, exist_ok=True)
+        out_path = save_dir / f"mc_result_{job_idx:04d}.npz"
         np.savez(
             out_path,
             samples=result.samples,
@@ -220,6 +221,6 @@ def monte_carlo_19D(
             probabilities=result.probabilities,
             unique_outcomes=result.unique_outcomes,
         )
-        logger.info(f"MC: saved result to {out_path}")
+        logger.info(f"MC: saved result to %s.", out_path)
 
     return result

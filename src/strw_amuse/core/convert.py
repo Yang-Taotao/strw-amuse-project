@@ -12,14 +12,14 @@ from src.strw_amuse.utils.config import MonteCarloResult
 logger = logging.getLogger(__name__)
 
 
-def to_MonteCarloResults(file_path: str) -> MonteCarloResult:
+def to_MonteCarloResults(file_path: Path | str) -> MonteCarloResult:
     """
     MC results converter
     - Load mc results from `file_path`
     - Convert to `MonteCarloResult` dataclass
 
     Args:
-        file_path (str): File path of `.npz` file.
+        file_path (Path | str): File path of `.npz` file.
 
     Returns:
         MonteCarloResult: MonteCarloResult dataclass for analysis.
@@ -66,6 +66,9 @@ def to_one_npz(
     if not files:
         raise FileNotFoundError(f"No files matching {pattern} in {dir_path}")
 
+    # quick fix for metadata concat
+    metadata_keys = {'param_names', 'unique_outcomes'}
+
     # get keys and basic shapes from first .npz
     first = np.load(files[0])
     keys: Iterable[str] = first.files
@@ -74,7 +77,16 @@ def to_one_npz(
     combined = {}
     for key in keys:
         arrays = [np.load(f)[key] for f in files]
-        combined[key] = np.concatenate(arrays, axis=0)
+        if key in metadata_keys:
+            # use metadata from 1st file
+            combined[key] = arrays[0]
+            logger.debug(f"Metadata {key}: using first file (shape: {arrays[0].shape})")
+        else:
+            # concat along axis=0
+            combined[key] = np.concatenate(arrays, axis=0)
+            logger.debug(
+                f"Data {key}: concatenated {len(files)} files (shape: {combined[key].shape})"
+            )
 
     np.savez_compressed(file_path, **combined)
     logger.info("MC run results combined to %s.", file_path)

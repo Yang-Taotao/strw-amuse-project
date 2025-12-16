@@ -2,17 +2,18 @@
 Visualization utilities for plotting MC run saved results.
 """
 
+from pathlib import Path
 from ..core import convert
 from ..plots import plotter
 from ..utils.config import PARAM_CORNER, PARAM_CROSS_SECTION
 
 
 def visualize(
-    file_path: str,
+    file_path: Path | str,
     outcome_name: str,
     param_groups: dict = PARAM_CROSS_SECTION,
     param_subset: list = PARAM_CORNER,
-    n_bins: int = 10,
+    n_bins: int = 100,
 ) -> None:
     """
     Wrapper function for visualizing MC run results.
@@ -21,7 +22,7 @@ def visualize(
     - Call `plotter.plot_velocity_spin_mass()`
 
     Args:
-        file_path (str): File path to MC results `.npz` file.
+        file_path (Path | str): File path to MC results `.npz` file.
         outcome_name (str): Name of the outcome to plot against.
         param_groups (dict, optional): Params data to load for `plot_cross_section()`.
             Defaults to `PARAM_CROSS_SECTION`.
@@ -43,7 +44,6 @@ def visualize(
         mc_result=data_result,
         outcome_name=outcome_name,
         param_subset=param_subset,
-        bins=n_bins,
     )
     plotter.plot_velocity_spin_mass(mc_result=data_result, outcome_filter=outcome_name)
     return None

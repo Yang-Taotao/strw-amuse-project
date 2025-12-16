@@ -3,11 +3,13 @@ Plotting utilities for AMUSE simulation.
 """
 
 import logging
-import os
+from pathlib import Path
 
 import corner
-import matplotlib.colors as mcolors
+import matplotlib as mpl
 import matplotlib.pyplot as plt
+import scienceplots
+import matplotlib.colors as mcolors
 import numpy as np
 from amuse.units import units
 from matplotlib.animation import FuncAnimation, PillowWriter
@@ -24,8 +26,11 @@ from ..utils.config import (
 
 logger = logging.getLogger(__name__)
 
+mpl.rcParams["text.usetex"] = False
+plt.style.use(['science', 'nature', 'no-latex'])
 
-def plot_gif(frames, run_label="test", massive_threshold=70.0):
+
+def plot_gif(frames, run_label="test", massive_threshold=70.0, save_dir: Path = OUTPUT_DIR_GIF):
     """
     Visualize AMUSE simulation frames and produce a GIF.
 
@@ -39,9 +44,6 @@ def plot_gif(frames, run_label="test", massive_threshold=70.0):
     if len(frames) == 0:
         logger.warning("No frames provided to `plot_gif()`.")
         return None
-
-    output_dir = OUTPUT_DIR_GIF
-    os.makedirs(output_dir, exist_ok=True)
 
     # --- Identify most massive stars in the final frame ---
     final_frame = frames[-1]
@@ -76,7 +78,7 @@ def plot_gif(frames, run_label="test", massive_threshold=70.0):
 
     # --- Gather all masses for color mapping ---
     all_masses = np.array([p.mass.value_in(units.MSun) for f in frames for p in f])
-    cmap = plt.get_cmap("plasma")
+    cmap = plt.get_cmap("viridis")
     norm = mcolors.Normalize(vmin=all_masses.min(), vmax=all_masses.max())
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 
@@ -84,7 +86,7 @@ def plot_gif(frames, run_label="test", massive_threshold=70.0):
         return cmap(norm(m))
 
     # --- Figure and subplots setup ---
-    fig, axes = plt.subplots(1, n_massive, figsize=(6 * n_massive, 6))
+    fig, axes = plt.subplots(1, n_massive, figsize=(8 * n_massive, 8))
     if n_massive == 1:
         axes = [axes]
 
@@ -103,8 +105,8 @@ def plot_gif(frames, run_label="test", massive_threshold=70.0):
             color="black",
         )
         time_text_list.append(t_text)
-        ax.set_xlabel("x [AU]")
-        ax.set_ylabel("y [AU]")
+        ax.set_xlabel("x (AU)")
+        ax.set_ylabel("y (AU)")
         ax.set_xlim(-100, 100)
         ax.set_ylim(-100, 100)
 
@@ -151,14 +153,15 @@ def plot_gif(frames, run_label="test", massive_threshold=70.0):
         repeat=False,
     )
 
-    gif_filename = os.path.join(OUTPUT_DIR_GIF, f"encounter_evolution_{run_label}.gif")
+    filename = save_dir / f"encounter_evolution_{run_label}.gif"
+    filename.parent.mkdir(parents=True, exist_ok=True)
     writer = PillowWriter(fps=10)
-    ani.save(gif_filename, writer=writer)
+    ani.save(filename=filename, writer=writer)
     plt.close(fig)
-    logger.info("GIF saved as %s", gif_filename)
+    logger.info("VIS: `plot_gif()` finished.")
 
 
-def plot_trajectory(frames, run_label="test"):
+def plot_trajectory(frames, run_label="test", save_dir: Path = OUTPUT_DIR_IMG):
     """
     Spaghetti plot of final frame stars and their trajectories over time.
     Centers on the most massive star in the final frame.
@@ -167,16 +170,13 @@ def plot_trajectory(frames, run_label="test"):
         logger.warning("No frames provided for `plot_trajectory()`.")
         return
 
-    output_dir = OUTPUT_DIR_IMG
-    os.makedirs(output_dir, exist_ok=True)
-
     final = frames[-1]
 
     # ---------------------------------------------------------
     # Build colormap for masses
     # ---------------------------------------------------------
     all_masses = np.array([p.mass.value_in(units.MSun) for f in frames for p in f])
-    cmap = plt.get_cmap("plasma")
+    cmap = plt.get_cmap("viridis")
     norm = mcolors.Normalize(vmin=all_masses.min(), vmax=all_masses.max())
     sm = plt.cm.ScalarMappable(cmap=cmap, norm=norm)
 
@@ -204,11 +204,11 @@ def plot_trajectory(frames, run_label="test"):
     # ---------------------------------------------------------
     # Prepare figure
     # ---------------------------------------------------------
-    fig, ax = plt.subplots(figsize=(8, 8), dpi=120)
-    ax.set_xlabel("x [AU]")
-    ax.set_ylabel("y [AU]")
+    fig, ax = plt.subplots(figsize=(8, 8), dpi=300)
+    ax.set_xlabel("x (AU)")
+    ax.set_ylabel("y (AU)")
     ax.set_title(f"Spaghetti plots: {run_label}")
-    plt.colorbar(sm, ax=ax, label="Mass [M$_\\odot$]")
+    plt.colorbar(sm, ax=ax, label=r"Mass [$M_{\odot}$]")
 
     # ---------------------------------------------------------
     # Helper to scatter stars
@@ -255,10 +255,11 @@ def plot_trajectory(frames, run_label="test"):
     # ---------------------------------------------------------
     # Save figure
     # ---------------------------------------------------------
-    png_filename = os.path.join(output_dir, f"Spaghetti_plot_{run_label}.png")
-    plt.savefig(png_filename)
-    logger.info("Spaghetti plot saved as %s", png_filename)
+    filename = save_dir / f"Spaghetti_plot_{run_label}.png"
+    filename.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(filename)
     plt.close(fig)
+    logger.info("VIS: `plot_trajectory()` finished.")
 
 
 def sampler_nd_coverage_plot(
@@ -267,7 +268,7 @@ def sampler_nd_coverage_plot(
     n_samples: int = N_SAMPLES,
     n_dims: int = N_DIMS,
     bounds: np.ndarray = BOUNDS,
-    save_dir: str = OUTPUT_DIR_SAMPLER,
+    save_dir: Path = OUTPUT_DIR_SAMPLER,
 ) -> None:
     """
     General plotter for sample coverage visualization.
@@ -285,12 +286,17 @@ def sampler_nd_coverage_plot(
     low, high = sampler.nd_bounds(bounds)
     coverage_np = sampler.nd_coverage(samples_np)
     coverage_sp = sampler.nd_coverage(samples_sp)
+    cmap = plt.get_cmap("viridis")
+    np_color = cmap(0.7)
+    sp_color = cmap(0.3)
 
     # fig init
-    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 3))
+
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     # Left: Uniform coverage
-    bars_np = ax1.bar(range(n_dims), coverage_np, color='blue', alpha=0.7, label='Uniform')
+    bars_np = ax1.bar(range(n_dims), coverage_np, color=np_color, alpha=0.7, label='Uniform')
     ax1.axhline(1.0, color='red', ls='--', lw=2, label='Perfect 100%')
     ax1.set_ylim(0, 1.05)
     ax1.set_xlabel('Parameter Index')
@@ -300,7 +306,7 @@ def sampler_nd_coverage_plot(
     ax1.grid(True, alpha=0.3)
 
     # Right: LHS coverage
-    bars_sp = ax2.bar(range(n_dims), coverage_sp, color='green', alpha=0.8, label='LHS')
+    bars_sp = ax2.bar(range(n_dims), coverage_sp, color=sp_color, alpha=0.8, label='LHS')
     ax2.axhline(1.0, color='red', ls='--', lw=2, label='Perfect 100%')
     ax2.set_ylim(0, 1.05)
     ax2.set_xlabel('Parameter Index')
@@ -312,58 +318,63 @@ def sampler_nd_coverage_plot(
     # 1d param converage comparison
     for i, cov in enumerate(coverage_sp):
         if cov > 0.99:
-            ax2.text(i, cov + 0.01, '✓', ha='center', va='bottom', fontsize=14, color='red')
+            ax2.text(i, cov + 0.01, '✓', ha='center', va='bottom', color='red')
 
-    plt.suptitle('Parameter Space Coverage Comparison', fontsize=16)
+    fig.suptitle('Parameter Space Coverage Comparison')
     plt.tight_layout()
-    plt.savefig(f'{save_dir}/1d_param_coverage_comparison.png', dpi=150, bbox_inches='tight')
+    fig.savefig(save_dir / '1d_param_coverage_comparison.png', dpi=300, bbox_inches='tight')
     plt.close()
 
     # corner
-    fig_left = plt.figure(figsize=(20, 20))
+    fig_left = plt.figure(figsize=(8, 8))
     corner.corner(
         samples_np,
         fig=fig_left,
-        color='blue',
-        alpha=0.6,
-        labels=[f'p{i}' for i in range(n_dims)],
-        range=[(low[i], high[i]) for i in range(n_dims)],
-        quantiles=[0.25, 0.5, 0.75],
+        color=np_color,
+        alpha=0.7,
+        n_bins=20,
+        labels=[f'p_{i}' for i in range(n_dims)],
         smooth=0.05,
         plot_datapoints=False,
-        plot_density=False,
     )
 
-    fig_left.suptitle(f'Uniform Corner Plot ({n_samples} samples)', fontsize=16)
-    plt.savefig(f'{save_dir}/uniform.png', dpi=100, bbox_inches='tight')
+    fig_left.suptitle(f'Uniform Sampling: {n_samples} samples', fontsize=16)
+    for ax in fig_left.get_axes():
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+    plt.savefig(save_dir / 'uniform.png', dpi=300, bbox_inches='tight')
     plt.close(fig_left)
 
-    fig_right = plt.figure(figsize=(20, 20))
+    fig_right = plt.figure(figsize=(8, 8))
     corner.corner(
         samples_sp,
         fig=fig_right,
-        color='green',
+        color=sp_color,
         alpha=0.7,
-        labels=[f'p{i}' for i in range(n_dims)],
-        range=[(low[i], high[i]) for i in range(n_dims)],
-        quantiles=[0.25, 0.5, 0.75],
+        n_bins=20,
+        labels=[f'p_{i}' for i in range(n_dims)],
         smooth=0.05,
         plot_datapoints=False,
-    )  # SAFE
+    )
 
-    fig_right.suptitle(f'LHS Corner Plot ({n_samples} samples)', fontsize=16)
-    plt.savefig(f'{save_dir}/lhs.png', dpi=100, bbox_inches='tight')
+    fig_right.suptitle(f'Latin Hypercube Sampling: {n_samples} samples', fontsize=16)
+    for ax in fig_right.get_axes():
+        ax.set_xticklabels([])
+        ax.set_yticklabels([])
+    plt.savefig(save_dir / 'lhs.png', dpi=300, bbox_inches='tight')
     plt.close(fig_right)
 
     # Summary stats
-    print("\n" + "=" * 50)
-    print("1D COVERAGE SUMMARY")
-    print("=" * 50)
-    print(f"Uniform sampling avg: {np.mean(coverage_np):.1%} ± {np.std(coverage_np):.1%}")
-    print(f"LHS     sampling avg: {np.mean(coverage_sp):.1%} ± {np.std(coverage_sp):.1%}")
-    print(f"LHS          perfect: {sum(1 for x in coverage_sp if x > 0.99)}/19")
-    print(f"Uniform      perfect: {sum(1 for x in coverage_np if x > 0.99)}/19")
-    print("=" * 50)
+    # print("\n" + "=" * 50)
+    # print("1D COVERAGE SUMMARY")
+    # print("=" * 50)
+    # print(f"Uniform sampling avg: {np.mean(coverage_np):.1%} ± {np.std(coverage_np):.1%}")
+    # print(f"LHS     sampling avg: {np.mean(coverage_sp):.1%} ± {np.std(coverage_sp):.1%}")
+    # print(f"LHS          perfect: {sum(1 for x in coverage_sp if x > 0.99)}/19")
+    # print(f"Uniform      perfect: {sum(1 for x in coverage_np if x > 0.99)}/19")
+    # print("=" * 50)
+
+    logger.info("VIS: `sampler_nd_coverage_plot()` finished.")
 
 
 def plot_cross_section(
@@ -395,11 +406,20 @@ def plot_cross_section(
         print(f"No stars produced outcome '{outcome_name}'")
         return
 
+    save_dir.mkdir(parents=True, exist_ok=True)
+
     weights = mc_result.all_star_weights[outcome_mask]
     sample_ids = mc_result.sample_ids[outcome_mask]
 
     n_plots = len(param_groups)
-    plt.figure(figsize=(5 * n_plots, 4))
+    n_col = 2
+    n_row = (n_plots + n_col) // n_col
+
+    cmap = plt.get_cmap("viridis")
+    band_color = cmap(0.7)
+    point_color = cmap(0.3)
+
+    plt.figure(figsize=(4 * n_col, 3 * n_row))
 
     for i, (group_name, param_names) in enumerate(param_groups.items(), start=1):
         # Collect all parameter values for the group
@@ -436,23 +456,59 @@ def plot_cross_section(
             sigma_err[j] = area * np.sqrt(np.sum(w_bin**2))
 
         # Plot
-        ax = plt.subplot(1, n_plots, i)
-        ax.errorbar(b_centers, sigma_binned, yerr=sigma_err, fmt='o', capsize=3, color='C0')
-        ax.plot(b_centers, sigma_binned, '-', color='C0')
-        ax.set_xlabel(group_name)
-        ax.set_ylabel(r"$\sigma_\mathrm{ionized}$ [AU$^2$]")
-        ax.grid(True)
+        ax = plt.subplot(n_row, n_col, i)
+
+        # 1) Error band (semi-transparent)
+        upper = sigma_binned + sigma_err
+        lower = sigma_binned - sigma_err
+        lower = np.clip(lower, 0.0, None)  # avoid negative cross-sections
+
+        ax.fill_between(
+            b_centers,
+            lower,
+            upper,
+            color=band_color,
+            alpha=0.5,
+            linewidth=0,
+            zorder=1,
+            label="Uncertainty",
+        )
+
+        ax.plot(b_centers, upper, color=band_color, alpha=0.5, linewidth=0.5)
+        ax.plot(b_centers, lower, color=band_color, alpha=0.5, linewidth=0.5)
+
+        # 2) Points only (no connecting line, smaller markers)
+        ax.scatter(
+            b_centers,
+            sigma_binned,
+            s=3,
+            color=point_color,
+            edgecolors="k",
+            linewidths=0.1,
+            zorder=3,
+            label="Cross section",
+        )
+
+        ax.set_xlabel(group_name, fontsize=14)
+        ax.set_ylabel(r"$\sigma_\mathrm{ionized} ~\left(\mathrm{AU}^2\right)$", fontsize=14)
+
+        ax.set_yscale("log")
+
+        # Optional: show legend only once or on each subplot
+        if i == 1:
+            ax.legend(fontsize=8)
 
     plt.tight_layout()
-    plt.savefig(f'{save_dir}/cross_section.png')
+    plt.savefig(save_dir / 'cross_section.png', dpi=300)
     plt.close()
+    logger.info("VIS: `plot_cross_section()` finished.")
 
 
 def corner_for_outcome(
     mc_result,
     outcome_name,
     param_subset=None,
-    bins=25,
+    bins=20,
     title_fmt=".2f",
     show_titles=True,
     save_dir=OUTPUT_DIR_IMG,
@@ -482,6 +538,8 @@ def corner_for_outcome(
         print(f"No samples produced outcome '{outcome_name}'")
         return
 
+    save_dir.mkdir(parents=True, exist_ok=True)
+
     # Map stars back to unique MC sample rows
     sample_rows = np.unique(mc_result.sample_ids[outcome_mask])
     n_samples_plot = len(sample_rows)
@@ -489,25 +547,69 @@ def corner_for_outcome(
     # ---- 2. Select parameters to plot ----
     if param_subset is None:
         data_to_plot = mc_result.samples[sample_rows, :]
-        labels = mc_result.param_names
+        label = mc_result.param_names
     else:
         # Find indices of selected parameters
         indices = [mc_result.param_names.index(p) for p in param_subset]
         data_to_plot = mc_result.samples[sample_rows][:, indices]
-        labels = param_subset
+        label = param_subset
+
+    label_dict = {
+        "ecc_0": r"$e_0$",
+        "ecc_1": r"$e_1$",
+        "ecc_2": r"$e_1$",
+        "sep_0": r"$\mathrm{sep}_0$",
+        "sep_1": r"$\mathrm{sep}_1$",
+        "sep_2": r"$\mathrm{sep}_2$",
+        "impact_parameter_0": r"$\rho_0$",
+        "impact_parameter_1": r"$\rho_1$",
+        "v_mag_0": r"${\mathrm{v}_\mathrm{mag}}_0$",
+        "v_mag_1": r"${\mathrm{v}_\mathrm{mag}}_1$",
+    }
+    labels = [label_dict.get(name, name) for name in label]
 
     # ---- 3. Check if sufficient data are present ----
     n_dims = data_to_plot.shape[1]
     if n_samples_plot < max(10, 2 * n_dims):
-        logger.info("Insufficient data, `corner_for_outcome()` skipped")
+        logger.info("VIS: Insufficient data, `corner_for_outcome()` skipped")
         return None
 
     # ---- 4. Make corner plot ----
-    fig = corner.corner(
-        data_to_plot, labels=labels, bins=bins, show_titles=show_titles, title_fmt=title_fmt
+    cmap = plt.get_cmap("viridis")
+    color = cmap(0.3)
+
+    fig = plt.figure(figsize=(8, 8))
+
+    label_kwargs = {"fontsize": 12}
+    title_kwargs = {"fontsize": 10}
+    hist_kwargs = {"color": color}
+
+    corner.corner(
+        data_to_plot,
+        fig=fig,
+        labels=labels,
+        bins=bins,
+        show_titles=show_titles,
+        title_fmt=title_fmt,
+        color=color,
+        plot_datapoints=True,
+        plot_contours=True,
+        plot_density=True,
+        fill_contours=True,
+        label_kwargs=label_kwargs,
+        title_kwargs=title_kwargs,
+        hist_kwargs=hist_kwargs,
     )
-    plt.savefig(f'{save_dir}/corner_outcome.png')
-    plt.close()
+
+    for ax in fig.get_axes():
+        # Rotate x tick labels
+        for label in ax.get_xticklabels():
+            label.set_rotation(45)
+            label.set_horizontalalignment('right')
+
+    fig.savefig(save_dir / 'corner_outcome.png', dpi=300)
+    plt.close(fig)
+    logger.info("VIS: `corner_for_outcome()` finished.")
 
 
 def plot_velocity_spin_mass(mc_result, outcome_filter=None, save_dir=OUTPUT_DIR_IMG):
@@ -540,15 +642,34 @@ def plot_velocity_spin_mass(mc_result, outcome_filter=None, save_dir=OUTPUT_DIR_
     spin = data['spin']  # 1/s
     mass = data['mass_Msun']  # Msun
 
-    plt.figure(figsize=(8, 6))
-    sc = plt.scatter(v, spin, c=mass, cmap='viridis', s=50, edgecolor='k', alpha=0.8)
-    cbar = plt.colorbar(sc)
-    cbar.set_label("Mass [Msun]", fontsize=12)
+    fig, ax = plt.subplots(figsize=(4, 3))
+    sc = ax.scatter(v, spin, c=mass, cmap='viridis', s=2, edgecolor='k', linewidths=0.1, alpha=0.8)
+    cbar = plt.colorbar(sc, ax=ax)
+    cbar.set_label(r"Mass $\left(M_{\odot}\right)$")
 
-    plt.xlabel("Velocity magnitude [km/s]", fontsize=12)
-    plt.ylabel("Spin [1/s]", fontsize=12)
-    plt.title("Velocity vs Spin colored by Mass", fontsize=14)
-    plt.grid(True, alpha=0.3)
-    plt.tight_layout()
-    plt.savefig(f'{save_dir}/velocity_spin_mass.png')
-    plt.close()
+    ax.set_xscale("log")
+    ax.set_yscale("log")
+
+    ax.set_xlabel(r"$\mathrm{v}_\mathrm{mag} ~\left(\mathrm{km}~\mathrm{s}^{-1}\right)$")
+    ax.set_ylabel(r"$s ~\left(\mathrm{s}^{-1}\right)$")
+
+    ax.text(
+        0.95,
+        0.95,
+        f"Number of Points = {len(v)}",
+        transform=ax.transAxes,
+        ha="right",
+        va="center",
+        bbox=dict(
+            boxstyle="square",
+            facecolor="white",
+            edgecolor="black",
+            alpha=0.8,
+            linewidth=0.2,
+        ),
+    )
+
+    fig.tight_layout()
+    fig.savefig(save_dir / 'velocity_spin_mass.png', dpi=300)
+    plt.close(fig)
+    logger.info("VIS: `plot_velocity_spin_mass()` finished.")

@@ -16,6 +16,8 @@ This is the README document for strw-amuse-project, a project for the 2025 [***S
     - [Some interesting questions](#some-interesting-questions)
   - [Example](#example)
   - [Example plots](#example-plots)
+  - [Flowchart](#flowchart)
+  - [File tree](#file-tree)
   - [Archived](#archived)
     - [Steps](#steps)
     - [Configs](#configs)
@@ -33,16 +35,21 @@ We list the collaborators in alphabetical order.
 
 ## Usage and Notes
 
+Preferred OS:
+
 ![Linux](https://img.shields.io/badge/-Linux-grey?logo=linux)
 
+General guideline:
+
 - Run project locally with [`main.py`](./main.py).
-- Configurations in [`config.py`](./src/strw_amuse/utils/config.py).
-- Check [`Documentation`](./docs/)(./docs/AMUSE_Install_v2025.9.0.md) for `AMUSE`.installation setup and example script for `AMUSE` simulations.
+- Default configurations listed in [`config.py`](./src/strw_amuse/utils/config.py) under `/utils`.
+- Check [`Documentation`](./docs/) for `AMUSE`.installation setup and a general example script for `AMUSE` simulations bridging stellar evolution, gravity, and hydrodynamics.
 - Require `AMUSE` [`v2025.9.0`](https://github.com/amusecode/amuse/releases/tag/v2025.9.0) for current project.
 - See [`environment.yml`](./environment.yml) for `Conda` environment.
 - See [`pyproject.toml`](./pyproject.toml) for `Black` config.
 - See [`setup.cfg`](./setup.cfg) for `isort` and `flake8` config.
 - See [`mc.sh`](./mc.sh) for running jobs on some HPC.
+- Sampler [`sampler.py`](./src/strw_amuse/core/sampler.py) generates both uniform sampling and LHS results with LHS as preferred samples for MC runs.
 
 ## Goals
 
@@ -50,20 +57,21 @@ Generate probability estimation of pistol star formation based off of some confi
 
 ### Idea
 
-- Shoot a triplet or binary at some host triplet or binary-binary system.
-- Use host triplet/quintuplet system as point of reference.
-- Get probability of these trails ejecting pistol star.
+- Shoot a binary at some host binary-binary system.
+- Use host quintuplet system as point of reference.
+- Get probability cross section of these simulation with ejecting pistol star.
   
 ### Assumptions
 
-- Close encounter event of bin-bin-bin or tri-tri has happened in some cluster.
-- Interaction take place in localized spatial environment
+- Close encounter event of bin-bin-bin has happened in some cluster.
+- Interaction take place in localized spatial environment.
 - Distant effect of other stars in the cluster is trivial.
 
 ### Some interesting questions
 
-- How likely to form in bin-bin-bin or tri-tri configuration?
+- How likely to form in bin-bin-bin configuration?
 - How is the cross section of pistol star ejection dependent on parameter space?
+- Are the mass of these pistol stars consistent with current observations?
 
 ## Example
 
@@ -74,7 +82,7 @@ Use [`main.py`](main.py) as an example on how to run one simulation run of this 
 
 # due to common `AMUSE` issue
 # use `warnings` for warning message supression
-import warnings 
+import warnings
 
 warnings.filterwarnings(
     "ignore",
@@ -82,37 +90,43 @@ warnings.filterwarnings(
     category=UserWarning,
 )
 
-# multiprocessing lib
 import multiprocessing
 
 from src.strw_amuse.core import convert
 from src.strw_amuse.plots import visualization
 from src.strw_amuse.sims import mc
-from src.strw_amuse.utils import logger
+from src.strw_amuse.utils import logger, config
 
 
 if __name__ == "__main__":
+    # make sure to activate the conda env for this run
     # init logger
     logger.setup_logging()
 
     # force mp
     multiprocessing.set_start_method("spawn", force=True)
 
-    # get mc results
+    # get mc results for smaller samples monte carlo simulation ~ 1-2 min real time
     result = mc.monte_carlo_19D(n_samples=10, n_workers=10)
 
-    # local repo
-    dir_path = "./data/mc/"
-    file_path = "./data/mc/mc_result_combined.npz"
+    # local dir assignment for results checcking
+    dir_path = config.DIR_BASE / "mc"
+    file_path = config.DIR_BASE / "mc" / "combined_mc.npz"
     outcome_name = "Creative_ionized"
-    n_bins = 10
+    n_bins = 500
 
-    # combine all mc results into singular file
+    # combine all mc results `.npz` files into singular file
     convert.to_one_npz(dir_path=dir_path, file_path=file_path)
 
     # visualiza mc results
     visualization.visualize(file_path=file_path, outcome_name=outcome_name, n_bins=n_bins)
 
+```
+
+This can be run simply in the project root directory with terminal entry:
+
+```sh
+> python main.py
 ```
 
 For runnin on HPC, use [`mc_hpc.py`](./mc_hpc.py) as an exmaple.
@@ -236,11 +250,74 @@ At some Monte Carlo run performed with a prior version of the project code base,
 | Plot | Description |
 |------|-------------|
 | ![ref case](./media/gif/encounter_evolution_ref_case.gif) | Refrencase case of binary-binary-binary interaction. |
-| ![test case](./media/gif/encounter_evolution_test_case.gif) | Test case of binary-binary-binary interaction with creative ionized outcome. |
-| ![param uniform](./media/img/param/uniform.png) | Uniform sampler param space coverage |
-| ![param lhs](./media/img/param/lhs.png) | Latin Hypercube sampler param space coverage |
+| ![test case](./media/gif/encounter_evolution_test_case.gif) | Test case of binary-binary-binary interaction with creative bound outcomes. |
+| ![param uniform](./media/img/param/uniform.png) | Uniform sampler param space coverage for `n_samples = 10000` |
+| ![param lhs](./media/img/param/lhs.png) | Latin Hypercube sampler param space coverage for `n_samples = 10000` |
 | ![param coverage comp](./media/img/param/1d_param_coverage_comparison.png) | Param coverage 1-d comparison |
-| ![Cross section](media/img/cross_section.png) | Cross section dependency over selective parameters |
+| ![cross section](media/img/cross_section.png) | Cross section dependency over selective parameters |
+| ![corner outcome](media/img/corner_outcome.png) | Corner plot of mc run outcomes with seletive param |
+
+## Flowchart
+
+![flowchat](media/img/flowchart.png)
+
+## File tree
+
+We list the project files in tree style:
+
+```sh
+.
+├── LICENSE
+├── README.md
+├── data
+│   ├── collisions
+│   ├── collisions_diagnostics
+│   ├── collisions_outcomes
+│   ├── final_states
+│   ├── logs
+│   ├── mc
+│   └── outcomes
+├── docs
+│   ├── AMUSE_Install_v2025.9.0.md
+│   └── example.py
+├── media
+│   ├── gif
+│   ├── img
+│   │   └── param
+│   └── snapshots
+├── notebooks
+├── src
+│   └── strw_amuse
+│       ├── __init__.py
+│       ├── core
+│       │   ├── __init__.py
+│       │   ├── collision.py
+│       │   ├── convert.py
+│       │   ├── helpers.py
+│       │   ├── sampler.py
+│       │   └── stopping.py
+│       ├── experimental
+│       │   └── helpers_tri.py
+│       ├── plots
+│       │   ├── __init__.py
+│       │   ├── plotter.py
+│       │   └── visualization.py
+│       ├── sims
+│       │   ├── __init__.py
+│       │   ├── mc.py
+│       │   └── run_sim.py
+│       └── utils
+│           ├── __init__.py
+│           ├── checker.py
+│           ├── config.py
+│           └── logger.py
+├── pyproject.toml
+├── environment.yml
+├── main.py
+├── mc.sh
+├── mc_hpc.py
+└── setup.cfg
+```
 
 ---
 
