@@ -4,12 +4,11 @@ Combining stellar dynamics, stellar evolution, and hydrodynamic mergers.
 """
 
 import logging
-import os
+from pathlib import Path
 import time
 
 from amuse.community.ph4.interface import ph4
 
-# from amuse.io import write_set_to_file
 from amuse.units import nbody_system, units
 
 from ..core.collision import collision
@@ -74,8 +73,7 @@ def run_6_body_simulation(
         OUTPUT_DIR_MC,
     )
     for d in output_dirs:
-        if not os.path.exists(d):
-            os.makedirs(d, exist_ok=True)
+        d.mkdir(parents=True, exist_ok=True)
 
     # logger.info("SIM: init [%s] logger.", run_label)
 

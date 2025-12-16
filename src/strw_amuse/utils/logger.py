@@ -5,7 +5,7 @@ Logger utilities.
 """
 
 import logging
-import os
+from pathlib import Path
 from logging.handlers import RotatingFileHandler
 
 from .config import OUTPUT_DIR_LOGS
@@ -41,7 +41,7 @@ def _get_mpi_rank() -> None | int:
 
 
 def setup_logging(
-    rank=None, log_dir=OUTPUT_DIR_LOGS, level=logging.INFO, name="src.strw_amuse"
+    rank=None, log_dir: Path = OUTPUT_DIR_LOGS, level=logging.INFO, name="src.strw_amuse"
 ) -> logging.Logger:
     """
     Configure logging for the package.
@@ -50,7 +50,7 @@ def setup_logging(
     ----------
     rank: int or None
         If None, an MPI rank will be attempted to be detected via `mpi4py`.
-    log_dir: str
+    log_dir: Path
         Directory where per-rank log files will be written if rank is not None.
     level: logging level
     name: logger name (default `src.strw_amuse` to match package module names)
@@ -58,7 +58,7 @@ def setup_logging(
     if rank is None:
         rank = _get_mpi_rank()
 
-    os.makedirs(log_dir, exist_ok=True)
+    log_dir.mkdir(parents=True, exist_ok=True)
 
     logger = logging.getLogger(name)
     logger.setLevel(level)
@@ -75,9 +75,9 @@ def setup_logging(
     logger.addHandler(ch)
 
     if rank is not None:
-        logfile = os.path.join(log_dir, f"{name}_rank{rank}.log")
+        logfile = log_dir / f"{name}_rank{rank}.log"
     else:
-        logfile = os.path.join(log_dir, f"{name}.log")
+        logfile = log_dir / f"{name}.log"
 
     fh = RotatingFileHandler(logfile, maxBytes=10_000_000, backupCount=3)
     fh.setLevel(level)

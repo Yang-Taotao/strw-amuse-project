@@ -7,22 +7,26 @@ Configuation file for the STRW-AMUSE project.
 
 from dataclasses import dataclass
 from typing import Final  # <- Set global imutable cfg const
-
+from pathlib import Path
 import numpy as np
 
 # configs - dir
 # ================================================================================================ #
-OUTPUT_DIR_COLLISIONS: Final = "./data/collisions"
-OUTPUT_DIR_COLLISIONS_DIAGNOSTICS: Final = "./data/collisions_diagnostics"
-OUTPUT_DIR_COLLISIONS_OUTCOMES: Final = "./data/collisions_outcomes"
-OUTPUT_DIR_FINAL_STATES: Final = "./data/final_states"
-OUTPUT_DIR_GIF: Final = "./media/gif"
-OUTPUT_DIR_IMG: Final = "./media/img"
-OUTPUT_DIR_LOGS: Final = "./data/logs"
-OUTPUT_DIR_MC: Final = "./data/mc"
-OUTPUT_DIR_OUTCOMES: Final = "./data/outcomes"
-OUTPUT_DIR_SAMPLER: Final = './media/img/param'
-OUTPUT_DIR_SNAPSHOTS: Final = "./media/snapshots"
+DIR_BASE: Final[Path] = Path(__file__).resolve().parents[3]
+DIR_DATA: Final[Path] = DIR_BASE / "data"
+DIR_MEDIA: Final[Path] = DIR_BASE / "media"
+# ================================================================================================ #
+OUTPUT_DIR_COLLISIONS: Final[Path] = DIR_DATA / "collisions"
+OUTPUT_DIR_COLLISIONS_DIAGNOSTICS: Final[Path] = DIR_DATA / "collisions_diagnostics"
+OUTPUT_DIR_COLLISIONS_OUTCOMES: Final[Path] = DIR_DATA / "collisions_outcomes"
+OUTPUT_DIR_FINAL_STATES: Final[Path] = DIR_DATA / "final_states"
+OUTPUT_DIR_GIF: Final[Path] = DIR_MEDIA / "gif"
+OUTPUT_DIR_IMG: Final[Path] = DIR_MEDIA / "img"
+OUTPUT_DIR_LOGS: Final[Path] = DIR_DATA / "logs"
+OUTPUT_DIR_MC: Final[Path] = DIR_DATA / "mc"
+OUTPUT_DIR_OUTCOMES: Final[Path] = DIR_DATA / "outcomes"
+OUTPUT_DIR_SAMPLER: Final[Path] = DIR_MEDIA / 'img' / 'param'
+OUTPUT_DIR_SNAPSHOTS: Final[Path] = DIR_MEDIA / "snapshots"
 # ================================================================================================ #
 
 # configs - global param

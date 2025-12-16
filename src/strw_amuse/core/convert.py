@@ -12,14 +12,14 @@ from src.strw_amuse.utils.config import MonteCarloResult
 logger = logging.getLogger(__name__)
 
 
-def to_MonteCarloResults(file_path: str) -> MonteCarloResult:
+def to_MonteCarloResults(file_path: Path | str) -> MonteCarloResult:
     """
     MC results converter
     - Load mc results from `file_path`
     - Convert to `MonteCarloResult` dataclass
 
     Args:
-        file_path (str): File path of `.npz` file.
+        file_path (Path | str): File path of `.npz` file.
 
     Returns:
         MonteCarloResult: MonteCarloResult dataclass for analysis.

@@ -3,7 +3,7 @@ Plotting utilities for AMUSE simulation.
 """
 
 import logging
-import os
+from pathlib import Path
 
 import corner
 import matplotlib as mpl
@@ -30,7 +30,7 @@ mpl.rcParams["text.usetex"] = False
 plt.style.use(['science', 'nature', 'no-latex'])
 
 
-def plot_gif(frames, run_label="test", massive_threshold=70.0):
+def plot_gif(frames, run_label="test", massive_threshold=70.0, save_dir: Path = OUTPUT_DIR_GIF):
     """
     Visualize AMUSE simulation frames and produce a GIF.
 
@@ -44,9 +44,6 @@ def plot_gif(frames, run_label="test", massive_threshold=70.0):
     if len(frames) == 0:
         logger.warning("No frames provided to `plot_gif()`.")
         return None
-
-    output_dir = OUTPUT_DIR_GIF
-    os.makedirs(output_dir, exist_ok=True)
 
     # --- Identify most massive stars in the final frame ---
     final_frame = frames[-1]
@@ -156,14 +153,15 @@ def plot_gif(frames, run_label="test", massive_threshold=70.0):
         repeat=False,
     )
 
-    gif_filename = os.path.join(OUTPUT_DIR_GIF, f"encounter_evolution_{run_label}.gif")
+    filename = save_dir / f"encounter_evolution_{run_label}.gif"
+    filename.parent.mkdir(parents=True, exist_ok=True)
     writer = PillowWriter(fps=10)
-    ani.save(gif_filename, writer=writer)
+    ani.save(filename=filename, writer=writer)
     plt.close(fig)
-    logger.info("GIF saved as %s", gif_filename)
+    logger.info("VIS: `plot_gif()` finished.")
 
 
-def plot_trajectory(frames, run_label="test"):
+def plot_trajectory(frames, run_label="test", save_dir: Path = OUTPUT_DIR_IMG):
     """
     Spaghetti plot of final frame stars and their trajectories over time.
     Centers on the most massive star in the final frame.
@@ -171,9 +169,6 @@ def plot_trajectory(frames, run_label="test"):
     if len(frames) == 0:
         logger.warning("No frames provided for `plot_trajectory()`.")
         return
-
-    output_dir = OUTPUT_DIR_IMG
-    os.makedirs(output_dir, exist_ok=True)
 
     final = frames[-1]
 
@@ -260,10 +255,11 @@ def plot_trajectory(frames, run_label="test"):
     # ---------------------------------------------------------
     # Save figure
     # ---------------------------------------------------------
-    png_filename = os.path.join(output_dir, f"Spaghetti_plot_{run_label}.png")
-    fig.savefig(png_filename)
+    filename = save_dir / f"Spaghetti_plot_{run_label}.png"
+    filename.parent.mkdir(parents=True, exist_ok=True)
+    fig.savefig(filename)
     plt.close(fig)
-    logger.info("Spaghetti plot saved as %s", png_filename)
+    logger.info("VIS: `plot_trajectory()` finished.")
 
 
 def sampler_nd_coverage_plot(
@@ -272,7 +268,7 @@ def sampler_nd_coverage_plot(
     n_samples: int = N_SAMPLES,
     n_dims: int = N_DIMS,
     bounds: np.ndarray = BOUNDS,
-    save_dir: str = OUTPUT_DIR_SAMPLER,
+    save_dir: Path = OUTPUT_DIR_SAMPLER,
 ) -> None:
     """
     General plotter for sample coverage visualization.
@@ -296,6 +292,8 @@ def sampler_nd_coverage_plot(
 
     # fig init
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(8, 3))
+
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     # Left: Uniform coverage
     bars_np = ax1.bar(range(n_dims), coverage_np, color=np_color, alpha=0.7, label='Uniform')
@@ -324,7 +322,7 @@ def sampler_nd_coverage_plot(
 
     fig.suptitle('Parameter Space Coverage Comparison')
     plt.tight_layout()
-    fig.savefig(f'{save_dir}/1d_param_coverage_comparison.png', dpi=300, bbox_inches='tight')
+    fig.savefig(save_dir / '1d_param_coverage_comparison.png', dpi=300, bbox_inches='tight')
     plt.close()
 
     # corner
@@ -344,7 +342,7 @@ def sampler_nd_coverage_plot(
     for ax in fig_left.get_axes():
         ax.set_xticklabels([])
         ax.set_yticklabels([])
-    plt.savefig(f'{save_dir}/uniform.png', dpi=300, bbox_inches='tight')
+    plt.savefig(save_dir / 'uniform.png', dpi=300, bbox_inches='tight')
     plt.close(fig_left)
 
     fig_right = plt.figure(figsize=(8, 8))
@@ -363,18 +361,20 @@ def sampler_nd_coverage_plot(
     for ax in fig_right.get_axes():
         ax.set_xticklabels([])
         ax.set_yticklabels([])
-    plt.savefig(f'{save_dir}/lhs.png', dpi=300, bbox_inches='tight')
+    plt.savefig(save_dir / 'lhs.png', dpi=300, bbox_inches='tight')
     plt.close(fig_right)
 
     # Summary stats
-    print("\n" + "=" * 50)
-    print("1D COVERAGE SUMMARY")
-    print("=" * 50)
-    print(f"Uniform sampling avg: {np.mean(coverage_np):.1%} ± {np.std(coverage_np):.1%}")
-    print(f"LHS     sampling avg: {np.mean(coverage_sp):.1%} ± {np.std(coverage_sp):.1%}")
-    print(f"LHS          perfect: {sum(1 for x in coverage_sp if x > 0.99)}/19")
-    print(f"Uniform      perfect: {sum(1 for x in coverage_np if x > 0.99)}/19")
-    print("=" * 50)
+    # print("\n" + "=" * 50)
+    # print("1D COVERAGE SUMMARY")
+    # print("=" * 50)
+    # print(f"Uniform sampling avg: {np.mean(coverage_np):.1%} ± {np.std(coverage_np):.1%}")
+    # print(f"LHS     sampling avg: {np.mean(coverage_sp):.1%} ± {np.std(coverage_sp):.1%}")
+    # print(f"LHS          perfect: {sum(1 for x in coverage_sp if x > 0.99)}/19")
+    # print(f"Uniform      perfect: {sum(1 for x in coverage_np if x > 0.99)}/19")
+    # print("=" * 50)
+
+    logger.info("VIS: `sampler_nd_coverage_plot()` finished.")
 
 
 def plot_cross_section(
@@ -405,6 +405,8 @@ def plot_cross_section(
     if not np.any(outcome_mask):
         print(f"No stars produced outcome '{outcome_name}'")
         return
+
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     weights = mc_result.all_star_weights[outcome_mask]
     sample_ids = mc_result.sample_ids[outcome_mask]
@@ -497,7 +499,7 @@ def plot_cross_section(
             ax.legend(fontsize=8)
 
     plt.tight_layout()
-    plt.savefig(f'{save_dir}/cross_section.png', dpi=300)
+    plt.savefig(save_dir / 'cross_section.png', dpi=300)
     plt.close()
     logger.info("VIS: `plot_cross_section()` finished.")
 
@@ -535,6 +537,8 @@ def corner_for_outcome(
     if not np.any(outcome_mask):
         print(f"No samples produced outcome '{outcome_name}'")
         return
+
+    save_dir.mkdir(parents=True, exist_ok=True)
 
     # Map stars back to unique MC sample rows
     sample_rows = np.unique(mc_result.sample_ids[outcome_mask])
@@ -603,7 +607,7 @@ def corner_for_outcome(
             label.set_rotation(45)
             label.set_horizontalalignment('right')
 
-    fig.savefig(f'{save_dir}/corner_outcome.png', dpi=300)
+    fig.savefig(save_dir / 'corner_outcome.png', dpi=300)
     plt.close(fig)
     logger.info("VIS: `corner_for_outcome()` finished.")
 
@@ -666,6 +670,6 @@ def plot_velocity_spin_mass(mc_result, outcome_filter=None, save_dir=OUTPUT_DIR_
     )
 
     fig.tight_layout()
-    fig.savefig(f'{save_dir}/velocity_spin_mass.png', dpi=300)
+    fig.savefig(save_dir / 'velocity_spin_mass.png', dpi=300)
     plt.close(fig)
     logger.info("VIS: `plot_velocity_spin_mass()` finished.")
